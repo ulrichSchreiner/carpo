@@ -6,12 +6,18 @@ import (
 )
 
 var index_html = `
-<html>
+<html ng-app>
 <head>
+<script src="http://code.angularjs.org/1.2.0-rc.3/angular.min.js"></script>
 <title>Test</title>
 </head>
 <script>
-var ws = new WebSocket("ws://localhost:8787/workspace");
+var h = window.location.hostname;
+var p = window.location.port;
+var prot = window.location.protocol=="http:" ? "ws://" : "wss://";
+
+var ws = new WebSocket(prot+h+":"+p+"/workspace");
+
 ws.onopen = function (){
 	console.log("on open");
 }

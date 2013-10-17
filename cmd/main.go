@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	_ "github.com/ulrichSchreiner/carpo/client"
 	_ "github.com/ulrichSchreiner/carpo/parser"
@@ -10,8 +11,10 @@ import (
 	"os"
 )
 
+var port = flag.Int("port", 8787, "the port to use for carpo")
+
 func main() {
-	fmt.Println("carpo started ...")
+	flag.Parse()
 	wd, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
@@ -20,6 +23,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	server.Start()
-	//parser.Parse()
+	fmt.Printf("carpo started at port %d...\n", *port)
+	server.Start(*port)
 }

@@ -2,6 +2,7 @@ package server
 
 import (
 	"code.google.com/p/gorest"
+	"fmt"
 	"net/http"
 )
 
@@ -25,6 +26,6 @@ func (serv HelloService) SayHello(name string) string {
 	return "Hello " + name
 }
 
-func Start() {
-	http.ListenAndServe(":8787", nil)
+func Start(port int) {
+	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 }
