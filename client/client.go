@@ -33,8 +33,12 @@ Test Body
 </body>
 </html>`
 
-func init() {
+func xinit() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, index_html)
 	})
+}
+
+func Init(cp string) {
+	http.Handle("/", http.FileServer(http.Dir(cp)))
 }

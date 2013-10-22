@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	_ "github.com/ulrichSchreiner/carpo/client"
+	"github.com/ulrichSchreiner/carpo/client"
 	_ "github.com/ulrichSchreiner/carpo/parser"
 	"github.com/ulrichSchreiner/carpo/server"
 	"github.com/ulrichSchreiner/carpo/workspace"
@@ -12,6 +12,7 @@ import (
 )
 
 var port = flag.Int("port", 8787, "the port to use for carpo")
+var clientpath = flag.String("clientpath", "../app", "the path to the client resource directory")
 
 func main() {
 	flag.Parse()
@@ -19,6 +20,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	client.Init(*clientpath)
 	err = workspace.NewWorkspace(wd)
 	if err != nil {
 		log.Fatal(err)
