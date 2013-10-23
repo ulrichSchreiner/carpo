@@ -12,7 +12,7 @@ import (
 )
 
 var port = flag.Int("port", 8787, "the port to use for carpo")
-var clientpath = flag.String("clientpath", "../app", "the path to the client resource directory")
+var clientpath = flag.String("clientpath", "../html/app/", "the path to the client resource directory")
 
 func main() {
 	flag.Parse()
