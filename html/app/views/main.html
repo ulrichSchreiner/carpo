@@ -1,4 +1,14 @@
-<div class="hero-unit">
+<div classs="hero-unit">
+	
+	<div>
+		<span ng-click="chabs($index)" ng-repeat="pe in workspace.pathentries"> {{pe}} </span>
+	</div>
+	<ul>
+        <li ng-repeat="e in workspace.entries">
+          <span ng-click="chdir(e.name)">{{e.name}}</span>
+        </li>
+    </ul>
+<!--
   <h1>'Allo, 'Allo!</h1>
   <p>You now have</p>
   <ul>
@@ -6,4 +16,5 @@
   </ul>
   <p>installed.</p>
   <h3>Enjoy coding! - Yeoman</h3>
+  -->
 </div>

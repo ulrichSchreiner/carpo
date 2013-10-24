@@ -13,15 +13,20 @@ import (
 
 var port = flag.Int("port", 8787, "the port to use for carpo")
 var clientpath = flag.String("clientpath", "../html/app/", "the path to the client resource directory")
+var wks = flag.String("workspace", "", "the path to the workspace")
 
 func main() {
 	flag.Parse()
-	wd, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
+	ws := wks
+	if ws == nil {
+		wd, err := os.Getwd()
+		if err != nil {
+			log.Fatal(err)
+		}
+		ws = &wd
 	}
 	client.Init(*clientpath)
-	err = workspace.NewWorkspace(wd)
+	err := workspace.NewWorkspace(*ws)
 	if err != nil {
 		log.Fatal(err)
 	}

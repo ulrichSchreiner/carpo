@@ -1,7 +1,7 @@
 'use strict';
 
 angular.module('htmlApp')
-  .service('Workspaceservice', function Workspaceservice() {
+  .service('Workspaceservice', function Workspaceservice($http) {
 	var service = {};
     var h = window.location.hostname;
     var p = window.location.port;
@@ -12,7 +12,7 @@ angular.module('htmlApp')
   	service.connect = function() {
 	    if(service.ws) { return; }
 	 
-	    var ws = new WebSocket(prot+h+":"+p+"/workspace");
+	    var ws = new WebSocket(prot+h+":"+p+"/wsworkspace");
 	 
 	    ws.onopen = function(e) {
 	      service.callback.open(e);
@@ -37,5 +37,10 @@ angular.module('htmlApp')
     	service.callback = callback;
   	}
  
+ 	service.dir = function (pt, callback) {
+ 		$http.get("/workspace/dir?path="+pt).then(function (data) {
+ 			callback(data);
+ 		});
+ 	}
   	return service;
   });
