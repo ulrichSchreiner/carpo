@@ -38,7 +38,19 @@ func (serv *workspace) dir(request *restful.Request, response *restful.Response)
 	path := filepath.Join(serv.Path, cpath)
 	var result Dir
 	result.Path = cpath
-	result.PathEntries = strings.Split(cpath, string(os.PathSeparator))
+	cp := cpath
+	if cp[0] == os.PathSeparator {
+		cp = cp[1:]
+	}
+	if len(cp) > 0 && cp[len(cp)-1] == os.PathSeparator {
+		cp = cp[0 : len(cp)-1]
+	}
+	log.Printf("cp = %+v, len=%d", cp, len(cp))
+	if len(cp) > 0 {
+		result.PathEntries = strings.Split(cp, string(os.PathSeparator))
+	} else {
+		result.PathEntries = []string{}
+	}
 	f, err := os.Open(path)
 	if err != nil {
 		response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Cannot read '%s' parameter: %s", path, err)))

@@ -1,20 +1,13 @@
-<div classs="hero-unit">
+<div >
 	
-	<div>
-		<span ng-click="chabs($index)" ng-repeat="pe in workspace.pathentries"> {{pe}} </span>
-	</div>
-	<ul>
-        <li ng-repeat="e in workspace.entries">
-          <span ng-click="chdir(e.name)">{{e.name}}</span>
-        </li>
-    </ul>
-<!--
-  <h1>'Allo, 'Allo!</h1>
-  <p>You now have</p>
-  <ul>
-      <li ng-repeat="thing in awesomeThings">{{thing}}</li>
-  </ul>
-  <p>installed.</p>
-  <h3>Enjoy coding! - Yeoman</h3>
-  -->
+	<ul class="breadcrumb">
+		<li><i class="icon-folder-open"></i> <a ng-click="chabs(-1)" >Home</a></li>
+		<li ng-repeat="pe in workspace.pathentries"><span class="divider">/</span><a ng-click="chabs($index)" >{{pe}}</a></li>
+	</ul>
+	<div id="dirEntries">
+        <div ng-repeat="e in workspace.entries">
+          <i ng-show="e.dir" class="icon-folder-close"></i><i ng-hide="e.dir" class="icon-file"></i> <span ng-click="chdir(e.name)">{{e.name}}</span>
+        </div>
+    </div>
+
 </div>
