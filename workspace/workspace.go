@@ -45,7 +45,6 @@ func (serv *workspace) dir(request *restful.Request, response *restful.Response)
 	if len(cp) > 0 && cp[len(cp)-1] == os.PathSeparator {
 		cp = cp[0 : len(cp)-1]
 	}
-	log.Printf("cp = %+v, len=%d", cp, len(cp))
 	if len(cp) > 0 {
 		result.PathEntries = strings.Split(cp, string(os.PathSeparator))
 	} else {
