@@ -1,13 +1,23 @@
 <div >
 	
 	<ul class="breadcrumb">
-		<li><i class="icon-folder-open"></i> <a ng-click="chabs(-1)" >Home</a></li>
-		<li ng-repeat="pe in workspace.pathentries"><span class="divider">/</span><a ng-click="chabs($index)" >{{pe}}</a></li>
+		<li><i class="icon-folder-open"></i> <a class="pathEntry" ng-click="chabs(-1)" >Home</a></li>
+		<li ng-repeat="pe in workspace.pathentries"><span class="divider">/</span><a class="pathEntry" ng-click="chabs($index)" >{{pe}}</a></li>
 	</ul>
 	<div id="dirEntries">
-        <div ng-repeat="e in workspace.entries">
-          <i ng-show="e.dir" class="icon-folder-close"></i><i ng-hide="e.dir" class="icon-file"></i> <span ng-click="chdir(e.name)">{{e.name}}</span>
+        <div ng-repeat="e in workspace.entries | orderBy:['-dir','name']">
+          <i ng-show="e.dir" class="icon-folder-close"></i><i ng-hide="e.dir" class="icon-file"></i> <span ng-click="selectFileElement(e.name,e.dir)">{{e.name}}</span>
         </div>
     </div>
 
+<tab ng-repeat="f in openfiles" heading="{{f.title}}" ng-controller="OpenfileCtrl">
+<div ng-model="content" ui-ace="{
+  useWrapMode : true,
+  showGutter: false,
+  theme:'twilight',
+  mode: 'golang',
+  onLoad: aceLoaded,
+  onChange: aceChanged
+}"></div>
+</tab>
 </div>

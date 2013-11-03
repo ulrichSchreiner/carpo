@@ -41,6 +41,13 @@ angular.module('htmlApp')
  		$http.get("/workspace/dir?path="+pt).then(function (data) {
  			callback(data);
  		});
- 	}
-  	return service;
+ 	};
+	
+ 	service.file = function (pt, callback) {
+ 		$http.get("/workspace/file?path="+pt).then(function (data) {
+ 			callback(data);
+ 		});
+ 	};
+	
+	return service;
   });

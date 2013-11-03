@@ -22,15 +22,19 @@ body {
 }
 
 .pathEntry {
-	background-color: #aaa;
-	padding: 5px;
-	margin: 3px;
+	cursor:pointer;
 }
 
 #dirEntries {
 	margin-left:10px;
 	width: 200px;
 	background-color:#f5f5f5;
+	cursor:pointer;
+	float:left;
+}
+
+.ace_editor  {
+  height : 500px;
 }
 
 .breadcrumb {

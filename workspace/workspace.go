@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/emicklei/go-restful"
 	"github.com/howeyc/fsnotify"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -20,6 +21,7 @@ func (w *workspace) Register(container *restful.Container) {
 		Produces(restful.MIME_JSON)
 	//ws.Route(ws.GET("/dir?path={path}").To(w.dir).Writes(Dir{}))
 	ws.Route(ws.GET("/dir").To(w.dir).Writes(Dir{}))
+	ws.Route(ws.GET("/file").To(w.file).Writes(FileContent{}))
 	container.Add(&ws)
 }
 
@@ -31,6 +33,32 @@ type Dir struct {
 	Path        string     `json:"path"`
 	PathEntries []string   `json:"pathentries"`
 	Entries     []DirEntry `json:"entries"`
+}
+
+type FileContent struct {
+	Content  string `json:"content"`
+	Title    string `json:"title"`
+	MimeType string `json:"mimetype"`
+}
+
+func (serv *workspace) file(request *restful.Request, response *restful.Response) {
+	cpath := request.QueryParameter("path")
+	path := filepath.Join(serv.Path, cpath)
+
+	var result FileContent
+	result.Title = filepath.Base(path)
+	f, err := os.Open(path)
+	if err != nil {
+		response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Cannot open content of '%s' parameter: %s", path, err)))
+	} else {
+		defer f.Close()
+		cnt, err := ioutil.ReadAll(f)
+		if err != nil {
+			response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Cannot read content of '%s' parameter: %s", path, err)))
+		}
+		result.Content = string(cnt)
+		response.WriteEntity(&result)
+	}
 }
 
 func (serv *workspace) dir(request *restful.Request, response *restful.Response) {
@@ -54,6 +82,7 @@ func (serv *workspace) dir(request *restful.Request, response *restful.Response)
 	if err != nil {
 		response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Cannot read '%s' parameter: %s", path, err)))
 	} else {
+		defer f.Close()
 		flz, err := f.Readdir(-1)
 		if err != nil {
 			response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Cannot read contents of '%s': %s", path, err)))
