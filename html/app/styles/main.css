@@ -26,14 +26,15 @@ body {
 }
 
 #dirEntries {
-	margin-left:10px;
+	margin-left:0px;
+	padding-left:10px;
 	width: 200px;
 	background-color:#f5f5f5;
 	cursor:pointer;
 	position:absolute;
-	bottom:15px;
+	bottom:125px;
 	top: 40px;
-	left: 10px;
+	left: 0px;
 }
 
 #filelist {
@@ -45,12 +46,18 @@ body {
 	top: 40px;
 	left:210px;
 	right: 0px;
-	bottom: 30px;
+	bottom: 146px;
+}
+#output {
+	clear:both;
+	position: absolute;
+	left: 0px;
+	right: 0px;
+	bottom: 0px;
+	height: 90px;
+	overflow: auto;
 }
 .ace_editor  {
-	position: relative;
-	top: 0px;
-	bottom: 0px;
 	height: 100%;
 }
 

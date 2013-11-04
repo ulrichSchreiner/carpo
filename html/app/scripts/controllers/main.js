@@ -31,7 +31,27 @@ angular.module('htmlApp')
 	$scope.openfiles = [];
 	$scope.currentfile = {};
 
-    $scope.chabs = function (idx) {
+	$scope.parseOutput_go = function (fname, res) {
+		$scope._aceEditor.getSession().clearAnnotations();
+		var lines = res.split("\n");
+		if (lines.length<1) return;
+		var compOutput = new RegExp("(\\./"+fname+"?):(\\d*):(.*)");
+		var annotations = [];
+		for (var i=1;i<lines.length; i++) {
+			var m = compOutput.exec(lines[i]);
+			if (m != null) {
+				annotations.push({
+                  row: parseInt(m[2])-1,
+                  column: 0,
+                  text: m[3],
+                  type: "error"
+                });
+			}
+		}
+		$scope._aceEditor.getSession().setAnnotations(annotations);
+	};
+	
+    $scope.chabs = function (idx) { 
 		var dr = "/";
 		for (var i=0; i<=idx; i++) {
 			dr = dr + $scope.workspace.pathentries[i]+"/";
@@ -73,11 +93,12 @@ angular.module('htmlApp')
 	};
 
 	$scope.saveFile = function (f) {
-		var doc = {path:f.path, content:f.content, mode:f.mode};
+		var doc = {path:f.path, content:f.content, mode:f.mode, build:true};
 		Workspaceservice.save(doc, function(d) {
-			console.log(d);
 			if (d.data.ok) {
 				f.dirty = false;
+				f.buildresult = d.data.buildresult;
+				$scope.parseOutput_go(f.title, d.data.buildresult);
 			}
 		});
 	}

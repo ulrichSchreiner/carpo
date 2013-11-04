@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -47,10 +48,12 @@ type FileSaveRequest struct {
 	Path    string `json:"path"`
 	Content string `json:"content"`
 	Mode    uint32 `json:"mode"`
+	Build   bool   `json:"build"`
 }
 type FileSaveResponse struct {
-	Ok      bool   `json:"ok"`
-	Message string `json:"message"`
+	Ok          bool   `json:"ok"`
+	Message     string `json:"message"`
+	BuildResult string `json:"buildresult"`
 }
 
 func (serv *workspace) getPathFromRequest(rq *restful.Request) (string, error) {
@@ -72,7 +75,32 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 		response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Error saving file '%s': %s", path, err)))
 		return
 	}
-	response.WriteEntity(FileSaveResponse{true, "File saved"})
+	buildresult := ""
+	if rq.Build {
+		fn := filepath.Base(path)
+		fp := filepath.Dir(path)
+		log.Printf("fn=%s, fp=%s\n", fn, fp)
+		if strings.HasSuffix(strings.ToLower(fn), ".go") {
+			log.Printf("it is go!")
+			if serv.gotool != nil {
+				cmd := exec.Command(*serv.gotool, "build")
+				cmd.Dir = fp
+				log.Printf("run: %+v", cmd)
+				res, err := cmd.CombinedOutput()
+				if err != nil {
+					buildresult = string(res)
+					//buildresult = fmt.Sprintf("<error running 'go build' in directory %s: %s ", fp, err)
+				} else {
+					buildresult = string(res)
+				}
+			} else {
+				buildresult = fmt.Sprintf("<error no 'go' tool available in path")
+			}
+		} else {
+			buildresult = "<no go file saved>"
+		}
+	}
+	response.WriteEntity(FileSaveResponse{true, "File saved", buildresult})
 	//f, err := os.Open(path, )
 }
 func (serv *workspace) file(request *restful.Request, response *restful.Response) {
@@ -144,6 +172,7 @@ func (serv *workspace) dir(request *restful.Request, response *restful.Response)
 type workspace struct {
 	Path    string
 	Watcher *fsnotify.Watcher
+	gotool  *string
 }
 
 type fileevent struct {
@@ -163,7 +192,13 @@ func Log(handler http.Handler) http.Handler {
 }
 
 func NewWorkspace(path string) error {
-	w := workspace{path, nil}
+	w := workspace{path, nil, nil}
+	gopath, err := exec.LookPath("go")
+	if err != nil {
+		log.Printf("no go tool found in path: %s\n", err)
+	} else {
+		w.gotool = &gopath
+	}
 	wsContainer := restful.NewContainer()
 	w.Register(wsContainer)
 
