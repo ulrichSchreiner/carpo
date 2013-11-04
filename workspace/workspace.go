@@ -22,6 +22,7 @@ func (w *workspace) Register(container *restful.Container) {
 	//ws.Route(ws.GET("/dir?path={path}").To(w.dir).Writes(Dir{}))
 	ws.Route(ws.GET("/dir").To(w.dir).Writes(Dir{}))
 	ws.Route(ws.GET("/file").To(w.file).Writes(FileContent{}))
+	ws.Route(ws.POST("/save").To(w.save).Reads(FileSaveRequest{}).Writes(FileSaveResponse{}))
 	container.Add(&ws)
 }
 
@@ -39,9 +40,15 @@ type FileContent struct {
 	Content  string `json:"content"`
 	Title    string `json:"title"`
 	MimeType string `json:"mimetype"`
+	FileMode uint32 `json:"filemode"`
 }
 
-type FileSave struct {
+type FileSaveRequest struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+	Mode    uint32 `json:"mode"`
+}
+type FileSaveResponse struct {
 	Ok      bool   `json:"ok"`
 	Message string `json:"message"`
 }
@@ -52,11 +59,20 @@ func (serv *workspace) getPathFromRequest(rq *restful.Request) (string, error) {
 	return path, nil
 }
 func (serv *workspace) save(request *restful.Request, response *restful.Response) {
-	_, err := serv.getPathFromRequest(request)
+	rq := new(FileSaveRequest)
+	err := request.ReadEntity(&rq)
 	if err != nil {
 		response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Illegal Path: %s", err)))
 		return
 	}
+	path := filepath.Join(serv.Path, "./"+rq.Path)
+	log.Printf("Save: %+v, path:%s", rq, path)
+	err = ioutil.WriteFile(path, []byte(rq.Content), os.FileMode(rq.Mode))
+	if err != nil {
+		response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Error saving file '%s': %s", path, err)))
+		return
+	}
+	response.WriteEntity(FileSaveResponse{true, "File saved"})
 	//f, err := os.Open(path, )
 }
 func (serv *workspace) file(request *restful.Request, response *restful.Response) {
@@ -76,7 +92,12 @@ func (serv *workspace) file(request *restful.Request, response *restful.Response
 		if err != nil {
 			response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Cannot read content of '%s' parameter: %s", path, err)))
 		}
+		fi, err := f.Stat()
+		if err != nil {
+			response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Cannot stat file '%s': %s", path, err)))
+		}
 		result.Content = string(cnt)
+		result.FileMode = uint32(fi.Mode())
 		response.WriteEntity(&result)
 	}
 }

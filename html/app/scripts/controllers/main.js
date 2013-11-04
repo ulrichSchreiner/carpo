@@ -72,11 +72,21 @@ angular.module('htmlApp')
 		}
 	};
 
+	$scope.saveFile = function (f) {
+		var doc = {path:f.path, content:f.content, mode:f.mode};
+		Workspaceservice.save(doc, function(d) {
+			console.log(d);
+			if (d.data.ok) {
+				f.dirty = false;
+			}
+		});
+	}
 	$scope.openFile = function (f)  {
 		var fn = $scope.data.cwd+f;
 		Workspaceservice.file(fn, function(d) {
 			var newItems = [];
-			var nf = {title:d.data.title, content:d.data.content, dirty:false, path:fn};
+			var nf = {title:d.data.title, content:d.data.content, dirty:false, path:fn, mode:d.data.filemode};
+			console.log("openFile:",d);
 			for (var i=0; i<$scope.openfiles.length; i++) {
 				var fl = $scope.openfiles[i];
 				if (fl.path != nf.path) {
@@ -120,6 +130,7 @@ angular.module('htmlApp')
 			bindKey: {win: "Ctrl-S", mac: "Command-S"},
 			exec: function(editor) {
 				console.log("Save:",editor);
+				$scope.saveFile($scope.currentfile.file);
 			}
         })
 	};
