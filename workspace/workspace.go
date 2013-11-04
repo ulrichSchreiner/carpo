@@ -41,10 +41,30 @@ type FileContent struct {
 	MimeType string `json:"mimetype"`
 }
 
-func (serv *workspace) file(request *restful.Request, response *restful.Response) {
-	cpath := request.QueryParameter("path")
-	path := filepath.Join(serv.Path, cpath)
+type FileSave struct {
+	Ok      bool   `json:"ok"`
+	Message string `json:"message"`
+}
 
+func (serv *workspace) getPathFromRequest(rq *restful.Request) (string, error) {
+	cpath := rq.QueryParameter("path")
+	path := filepath.Join(serv.Path, "./"+cpath)
+	return path, nil
+}
+func (serv *workspace) save(request *restful.Request, response *restful.Response) {
+	_, err := serv.getPathFromRequest(request)
+	if err != nil {
+		response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Illegal Path: %s", err)))
+		return
+	}
+	//f, err := os.Open(path, )
+}
+func (serv *workspace) file(request *restful.Request, response *restful.Response) {
+	path, err := serv.getPathFromRequest(request)
+	if err != nil {
+		response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Illegal Path: %s", err)))
+		return
+	}
 	var result FileContent
 	result.Title = filepath.Base(path)
 	f, err := os.Open(path)
@@ -63,7 +83,12 @@ func (serv *workspace) file(request *restful.Request, response *restful.Response
 
 func (serv *workspace) dir(request *restful.Request, response *restful.Response) {
 	cpath := request.QueryParameter("path")
-	path := filepath.Join(serv.Path, cpath)
+	path, err := serv.getPathFromRequest(request)
+	if err != nil {
+		response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Illegal Path: %s", err)))
+		return
+	}
+
 	var result Dir
 	result.Path = cpath
 	cp := cpath

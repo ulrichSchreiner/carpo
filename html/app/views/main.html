@@ -1,5 +1,5 @@
 <div >
-	
+
 	<ul class="breadcrumb">
 		<li><i class="icon-folder-open"></i> <a class="pathEntry" ng-click="chabs(-1)" >Home</a></li>
 		<li ng-repeat="pe in workspace.pathentries"><span class="divider">/</span><a class="pathEntry" ng-click="chabs($index)" >{{pe}}</a></li>
@@ -9,9 +9,11 @@
           <i ng-show="e.dir" class="icon-folder-close"></i><i ng-hide="e.dir" class="icon-file"></i> <span ng-click="selectFileElement(e.name,e.dir)">{{e.name}}</span>
         </div>
     </div>
-
-<tab ng-repeat="f in openfiles" heading="{{f.title}}" ng-controller="OpenfileCtrl">
-<div ng-model="content" ui-ace="{
+<div id="editor">
+<div >
+	<button ng-repeat="f in openfiles" ng-class="{true:'btn btn-primary',false:'btn'}[f.path==currentfile.file.path]" class="btn" type="button" ng-click="selectFile(f)" title="{{f.path}}"><span ng-show="f.dirty">* </span>{{f.title}} <i ng-click="closeFile(f)" class="icon-remove"></i></button>
+</div>
+<div ng-model="currentfile.content" ui-ace="{
   useWrapMode : true,
   showGutter: false,
   theme:'twilight',
@@ -19,5 +21,6 @@
   onLoad: aceLoaded,
   onChange: aceChanged
 }"></div>
-</tab>
+</div>
+
 </div>
