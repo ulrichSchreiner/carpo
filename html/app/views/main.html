@@ -11,7 +11,7 @@
     </div>
 <div id="editor">
 <div style="line-height:25px; height:25px; position:relative;">
-	<button ng-repeat="f in openfiles" ng-class="{true:'btn btn-primary',false:'btn'}[f.path==currentfile.file.path]" class="btn" type="button" ng-click="selectFile(f)" title="{{f.path}}"><span ng-show="f.dirty">* </span>{{f.title}} <i ng-click="closeFile(f)" class="icon-remove"></i></button>
+	<button ng-repeat="f in openfiles" ng-class="{true:'btn btn-primary',false:'btn'}[f.path==currentfile.path]" class="btn" type="button" ng-click="selectFile(f)" title="{{f.path}}"><span ng-show="f.dirty">* </span>{{f.title}} <i ng-click="closeFile(f)" class="icon-remove"></i></button>
 </div>
 <div ng-model="currentfile.content" ui-ace="{
   useWrapMode : true,
@@ -22,5 +22,5 @@
   onChange: aceChanged
 }"></div>
 </div>
-<pre id="output">{{currentfile.file.buildresult}}</pre>
+<pre id="output">{{currentfile.buildresult}}</pre>
 </div>

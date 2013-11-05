@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/emicklei/go-restful"
 	"github.com/howeyc/fsnotify"
+	"go/format"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -12,6 +13,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+)
+
+const (
+	BUILD_GOLANG = "golang"
 )
 
 func (w *workspace) Register(container *restful.Container) {
@@ -51,9 +56,11 @@ type FileSaveRequest struct {
 	Build   bool   `json:"build"`
 }
 type FileSaveResponse struct {
-	Ok          bool   `json:"ok"`
-	Message     string `json:"message"`
-	BuildResult string `json:"buildresult"`
+	Ok               bool   `json:"ok"`
+	Message          string `json:"message"`
+	BuildResult      string `json:"buildresult"`
+	BuildType        string `json:"buildtype"`
+	FormattedContent string `json:"formattedcontent"`
 }
 
 func (serv *workspace) getPathFromRequest(rq *restful.Request) (string, error) {
@@ -69,39 +76,35 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 		return
 	}
 	path := filepath.Join(serv.Path, "./"+rq.Path)
-	log.Printf("Save: %+v, path:%s", rq, path)
-	err = ioutil.WriteFile(path, []byte(rq.Content), os.FileMode(rq.Mode))
+	src, err := format.Source([]byte(rq.Content))
+	if err != nil {
+		src = []byte(rq.Content)
+	}
+
+	err = ioutil.WriteFile(path, src, os.FileMode(rq.Mode))
 	if err != nil {
 		response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Error saving file '%s': %s", path, err)))
 		return
 	}
-	buildresult := ""
+	fres := FileSaveResponse{true, "File saved", "", "", string(src)}
 	if rq.Build {
 		fn := filepath.Base(path)
 		fp := filepath.Dir(path)
-		log.Printf("fn=%s, fp=%s\n", fn, fp)
 		if strings.HasSuffix(strings.ToLower(fn), ".go") {
-			log.Printf("it is go!")
 			if serv.gotool != nil {
+				fres.BuildType = BUILD_GOLANG
 				cmd := exec.Command(*serv.gotool, "build")
 				cmd.Dir = fp
-				log.Printf("run: %+v", cmd)
-				res, err := cmd.CombinedOutput()
-				if err != nil {
-					buildresult = string(res)
-					//buildresult = fmt.Sprintf("<error running 'go build' in directory %s: %s ", fp, err)
-				} else {
-					buildresult = string(res)
-				}
+				res, _ := cmd.CombinedOutput()
+				fres.BuildResult = string(res)
 			} else {
-				buildresult = fmt.Sprintf("<error no 'go' tool available in path")
+				fres.BuildResult = fmt.Sprintf("<error no 'go' tool available in path")
 			}
 		} else {
-			buildresult = "<no go file saved>"
+			fres.BuildResult = "<no go file saved>"
 		}
 	}
-	response.WriteEntity(FileSaveResponse{true, "File saved", buildresult})
-	//f, err := os.Open(path, )
+	response.WriteEntity(fres)
 }
 func (serv *workspace) file(request *restful.Request, response *restful.Response) {
 	path, err := serv.getPathFromRequest(request)
