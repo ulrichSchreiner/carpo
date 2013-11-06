@@ -40,12 +40,16 @@ angular.module('htmlApp')
 		res.mode = f.filemode;
 		res.dirty = false;
 		res.buildresult = "";
-		res.type = null;
+		res.type = "text";
 		var fn = f.title.toLowerCase();
 		if (fn != null) {
 			var suffix = fn.split(".");
-			res.type = $scope.acemodes[suffix[suffix.length-1]];
+			var tp = $scope.acemodes["."+suffix[suffix.length-1]];
+			if (tp != null)
+				res.type = tp;
 		}
+		var mode = ace.require("ace/ext/modelist").getModeForPath(f.title);
+		res.session = ace.createEditSession(f.content, mode.mode)
 		return res;
 	}
 
@@ -58,14 +62,7 @@ angular.module('htmlApp')
     };
 	$scope.selectFile = function(f) {
 		$scope.currentfile = f;
-		var fn = f.title.toLowerCase();
-		if (fn != null) {
-			var suffix = fn.split(".");
-			var mode = $scope.acemodes[suffix[suffix.length-1]];
-			if (mode != null) {
-				$scope._aceEditor.getSession().setMode("ace/mode/" + mode);
-			}
-		}
+		$scope._aceEditor.setSession(f.session);
 	};
 
 	$scope.closeFile = function (f) {
@@ -89,24 +86,22 @@ angular.module('htmlApp')
 		}
 	};
 
-	$scope.saveFile = function (f, pos) {
-		var doc = {path:f.path, content:f.content, mode:f.mode, build:true};
+	$scope.saveFile = function (f) {
+		var doc = {path:f.path, content:f.session.getValue(), mode:f.mode, build:true};
 		Workspaceservice.save(doc, function(d) {
 			if (d.data.ok) {
 				f.dirty = false;
 				f.buildresult = d.data.buildresult;
+				var pos = null;
+				if (f.session = $scope._aceEditor.getSession())
+					pos = $scope._aceEditor.getCursorPosition();
+				f.session.setValue(d.data.formattedcontent);
+				f.content = d.data.formattedcontent;
+				if (pos != null)
+					$scope._aceEditor.moveCursorToPosition(pos);
 				var p = $scope.outputParser[d.data.buildtype];
 				if (p != null)
 					p(f, d.data.buildresult);
-				if ($scope.currentfile.path == f.path) {
-					//
-					$scope._aceEditor.setValue(d.data.formattedcontent);
-					if (pos != null) {
-						$scope._aceEditor.moveCursorToPosition(pos);
-					}
-				} else {
-					f.content = d.data.formattedcontent;
-				}
 			}
 		});
 	}
@@ -114,20 +109,20 @@ angular.module('htmlApp')
 		var fn = $scope.data.cwd+f;
 		Workspaceservice.file(fn, function(d) {
 			var newItems = [];
-			var nf = $scope.newClientFile (d.data, fn);
+			var nf = null;
 			for (var i=0; i<$scope.openfiles.length; i++) {
 				var fl = $scope.openfiles[i];
-				if (fl.path != nf.path) {
+				if (fl.path != fn) {
 					newItems.push(fl);
 				} else {
 					// file already open, compare content before loading new one in editor?
-					fl.content = nf.content;
-					fl.title = nf.title;
-					fl.path = fn;
+					nf = fl;
+					nf.content = d.data.content;
 					$scope.selectFile(nf);
 					return;
 				}
 			}
+			nf = $scope.newClientFile (d.data, fn);
 
 			newItems.push(nf);
 			$scope.openfiles = newItems;
@@ -157,8 +152,7 @@ angular.module('htmlApp')
 			name: "saveDocument",
 			bindKey: {win: "Ctrl-S", mac: "Command-S"},
 			exec: function(editor) {
-				var pos = $scope._aceEditor.getCursorPosition();
-				$scope.saveFile($scope.currentfile, pos);
+				$scope.saveFile($scope.currentfile);
 			}
         })
 	};
@@ -183,10 +177,11 @@ angular.module('htmlApp')
 	// build output parsers
 	$scope.parseOutput_golang = function (f, res) {
 		var fname = f.title;
-		$scope._aceEditor.getSession().clearAnnotations();
+		f.session.clearAnnotations();
 		var lines = res.split("\n");
 		if (lines.length<1) return;
-		var compOutput = new RegExp("(\\./"+fname+"?):(\\d*):(.*)");
+		//var compOutput = new RegExp("(\\./"+fname+"?):(\\d*):(.*)");
+		var compOutput = new RegExp("("+fname+"?):(\\d*):(.*)");
 		var annotations = [];
 		for (var i=1;i<lines.length; i++) {
 			var m = compOutput.exec(lines[i]);
@@ -199,7 +194,7 @@ angular.module('htmlApp')
                 });
 			}
 		}
-		$scope._aceEditor.getSession().setAnnotations(annotations);
+		f.session.setAnnotations(annotations);
 	};
 	$scope.outputParser = {
 		"golang":$scope.parseOutput_golang

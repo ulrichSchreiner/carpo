@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/emicklei/go-restful"
 	"github.com/howeyc/fsnotify"
+	"github.com/ulrichSchreiner/carpo/golang"
 	"go/format"
 	"io/ioutil"
 	"log"
@@ -86,10 +87,11 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 		response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Error saving file '%s': %s", path, err)))
 		return
 	}
+	fn := filepath.Base(path)
+	fp := filepath.Dir(path)
+	golang.Parse(string(src), fn)
 	fres := FileSaveResponse{true, "File saved", "", "", string(src)}
 	if rq.Build {
-		fn := filepath.Base(path)
-		fp := filepath.Dir(path)
 		if strings.HasSuffix(strings.ToLower(fn), ".go") {
 			if serv.gotool != nil {
 				fres.BuildType = BUILD_GOLANG
