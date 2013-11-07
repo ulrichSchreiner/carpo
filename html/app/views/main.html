@@ -1,6 +1,7 @@
-
+<div id="content" snap-content>
 <div >
-	<ul class="breadcrumb">
+	<ul class="breadcrumb" >
+		<li><i snap-toggle="left" class="icon-align-justify"></i><span class="divider"></span></li>
 		<li><i class="icon-folder-open"></i> <a class="pathEntry" ng-click="chabs(-1)" >Home</a></li>
 		<li ng-repeat="pe in workspace.pathentries"><span class="divider">/</span><a class="pathEntry" ng-click="chabs($index)" >{{pe}}</a></li>
 	</ul>
@@ -38,4 +39,12 @@
 </div>
 <div style="position:absolute;bottom:0;width:100%;z-index:100;">
   <alert ng-repeat="alert in alerts" type="alert.type" close="closeAlert($index)">{{alert.msg}}</alert>
+</div>
+</div>
+<div snap-drawer="left">
+<ul class="nav nav-list">
+  <li class="nav-header">Settings</li>
+  <li><a ng-click="editorSettings()">Editor</a></li>
+  <li><a href="#">Library</a></li>
+</ul>
 </div>

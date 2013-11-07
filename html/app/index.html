@@ -13,6 +13,7 @@
 
         <!-- build:css(.tmp) styles/main.css -->
         <link rel="stylesheet" href="styles/bootstrap.css">
+		<link rel="stylesheet" href="bower_components/angular-snap/angular-snap.css">
         <link rel="stylesheet" href="styles/main.css">
         <!-- endbuild -->
 </head>
@@ -27,7 +28,7 @@
     <![endif]-->
 
     <!-- Add your site or application content here -->
-    <div class="dcontainer" ng-view=""></div>
+    <div yclass="container" ng-view=""></div>
 
     <!-- Google Analytics: change UA-XXXXX-X to be your site's ID -->
      <script>
@@ -67,6 +68,8 @@
         <script src="bower_components/angular-resource/angular-resource.js"></script>
         <script src="bower_components/angular-cookies/angular-cookies.js"></script>
         <script src="bower_components/angular-sanitize/angular-sanitize.js"></script>
+		<script src="bower_components/snapjs/snap.js"></script>
+		<script src="bower_components/angular-snap/angular-snap.js"></script>
 				<script src="bower_components/angular-bootstrap/ui-bootstrap-tpls.min.js"></script>
 			 <script src="bower_components/angular-ui-ace/ui-ace.js"></script>
         <!-- endbuild -->
@@ -77,6 +80,7 @@
         <script src="scripts/controllers/createFileElement.js"></script>
         <script src="scripts/services/workspaceService.js"></script>
         <script src="scripts/controllers/main.js"></script>
+        <script src="scripts/controllers/settings.js"></script>
         <!-- endbuild -->
 </body>
 </html>

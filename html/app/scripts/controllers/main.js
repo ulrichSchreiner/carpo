@@ -203,7 +203,19 @@ angular.module('htmlApp')
 				$scope.workspace[e] = d.data[e];
 			}
 	    });
-    }
+    };
+	$scope.editorSettings = function () {
+		var modalInstance = $modal.open({
+ 	     	templateUrl: 'views/editorsettings.html',
+ 	     	controller: 'EditorSettingsCtrl',
+			resolve: {
+ 	     	}
+    	});
+
+      modalInstance.result.then(function (item) {
+		console.log(item);
+      });		
+	};
 	$scope.aceLoaded = function(_editor) {
       // Options
 	 // _editor.setReadOnly(true);

@@ -5,7 +5,8 @@ angular.module('htmlApp', [
   'ngResource',
   'ngSanitize',
   'ui.ace',
-  'ui.bootstrap'
+  'ui.bootstrap',
+  'snap'
 ])
   .config(function ($routeProvider) {
     $routeProvider

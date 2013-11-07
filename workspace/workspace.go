@@ -255,12 +255,15 @@ func Log(handler http.Handler) http.Handler {
 }
 
 func NewWorkspace(path string) error {
-	workdir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("cannot get current workingdir: %s", err)
+	if !filepath.IsAbs(path) {
+		workdir, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("cannot get current workingdir: %s", err)
+		}
+
+		path = filepath.Join(workdir, path)
 	}
-	workdir = filepath.Join(workdir, path)
-	w := workspace{workdir, nil, nil}
+	w := workspace{path, nil, nil}
 	gopath, err := exec.LookPath("go")
 	if err != nil {
 		log.Printf("no go tool found in path: %s\n", err)
