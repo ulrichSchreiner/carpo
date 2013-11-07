@@ -43,9 +43,17 @@ angular.module('htmlApp')
  		});
  	};
  	service.createdir = function (pt, callback) {
- 		$http.get("/workspace/createdir?path="+pt).then(function (data) {
+ 		$http.get("/workspace/mkdir?path="+pt).then(function (data) {
  			callback(data);
  		});
+ 	};
+ 	service.createfile = function (pt, callback) {
+ 		$http.get("/workspace/touch?path="+pt).then(function (data) {
+ 			callback(data);
+ 		});
+ 	};
+ 	service.rm = function (pt, callback) {
+		return $http.get("/workspace/rm?path="+pt);
  	};
 
  	service.file = function (pt, callback) {

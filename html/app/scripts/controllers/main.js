@@ -28,8 +28,17 @@ angular.module('htmlApp')
 	$scope.data = {};
 	$scope.data.cwd = "/";
 	$scope.openfiles = [];
+	$scope.alerts = [];
 	//$scope.currentfile = {};
 	$scope.currentfile = null;
+
+	$scope.addAlert = function(message) {
+    		$scope.alerts.push({type:"error", msg: message});
+	};
+
+	$scope.closeAlert = function(index) {
+		$scope.alerts.splice(index, 1);
+	};
 
 	$scope.newClientFile = function (f, path) {
 		// create an ace-editorsession here !!!
@@ -53,6 +62,16 @@ angular.module('htmlApp')
 		return res;
 	}
 
+	$scope.deleteFileElement = function(f) {
+		Workspaceservice.rm($scope.data.cwd+f.name).then(function (d) {
+			for (var e in d.data) {
+				$scope.workspace[e] = d.data[e];
+			}
+	    }, function(e) {
+			$scope.addAlert(e.data.Message);
+		});
+	};
+
 	$scope.createFile = function () {
 	  var modalInstance = $modal.open({
       	templateUrl: 'views/createFileElement.html',
@@ -64,14 +83,33 @@ angular.module('htmlApp')
     	  });
 
       modalInstance.result.then(function (item) {
-        console.log("create File:",item);
-      }, function () {
-        console.log("create File dismissed");
+		var pt = $scope.data.cwd+item;
+		Workspaceservice.createfile(pt,function (d) {
+			for (var e in d.data) {
+				$scope.workspace[e] = d.data[e];
+			}
+	    });
       });
 	};
 
 	$scope.createFolder = function () {
+	  var modalInstance = $modal.open({
+      	templateUrl: 'views/createFileElement.html',
+      	controller: 'CreatefileElementCtrl',
+		resolve: {
+           elementType: function() { return "Directory";},
+		  parentDir: function() { return $scope.data.cwd; }
+      	}
+    	  });
 
+      modalInstance.result.then(function (item) {
+		var pt = $scope.data.cwd+item;
+		Workspaceservice.createdir(pt,function (d) {
+			for (var e in d.data) {
+				$scope.workspace[e] = d.data[e];
+			}
+	    });
+      });
 	};
 
     $scope.chabs = function (idx) {
@@ -93,6 +131,7 @@ angular.module('htmlApp')
 			if (fl.title != f.title) {
 				newItems.push(fl);
 			} else {
+				f.session.setValue("");
 				// file to close ...
 				// perhaps save dialog here ???
 			}

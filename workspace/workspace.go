@@ -28,7 +28,9 @@ func (w *workspace) Register(container *restful.Container) {
 		Produces(restful.MIME_JSON)
 	//ws.Route(ws.GET("/dir?path={path}").To(w.dir).Writes(Dir{}))
 	ws.Route(ws.GET("/dir").To(w.dir).Writes(Dir{}))
-	ws.Route(ws.GET("/createdir").To(w.createdir).Writes(Dir{}))
+	ws.Route(ws.GET("/mkdir").To(w.createdir).Writes(Dir{}))
+	ws.Route(ws.GET("/touch").To(w.touch).Writes(Dir{}))
+	ws.Route(ws.GET("/rm").To(w.rmfile).Writes(Dir{}))
 	ws.Route(ws.GET("/file").To(w.file).Writes(FileContent{}))
 	ws.Route(ws.POST("/save").To(w.save).Reads(FileSaveRequest{}).Writes(FileSaveResponse{}))
 	container.Add(&ws)
@@ -80,12 +82,12 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 	rq := new(FileSaveRequest)
 	err := request.ReadEntity(&rq)
 	if err != nil {
-		response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Illegal Request: %s", err)))
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Request: %s", err))
 		return
 	}
 	path, _, err := serv.getPathFromRequest(rq.Path)
 	if err != nil {
-		response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Illegal Path: %s", err)))
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Path: %s", err))
 		return
 	}
 	src, err := format.Source([]byte(rq.Content))
@@ -95,7 +97,7 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 
 	err = ioutil.WriteFile(path, src, os.FileMode(rq.Mode))
 	if err != nil {
-		response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Error saving file '%s': %s", path, err)))
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Error saving file '%s': %s", path, err))
 		return
 	}
 	fn := filepath.Base(path)
@@ -122,23 +124,23 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 func (serv *workspace) file(request *restful.Request, response *restful.Response) {
 	path, rpath, err := serv.getPathFromRequest(request.QueryParameter("path"))
 	if err != nil {
-		response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Illegal Path: %s", err)))
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Path: %s", err))
 		return
 	}
 	var result FileContent
 	result.Title = filepath.Base(path)
 	f, err := os.Open(path)
 	if err != nil {
-		response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Cannot open content of '%s' parameter: %s", rpath, err)))
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot open content of '%s' parameter: %s", rpath, err))
 	} else {
 		defer f.Close()
 		cnt, err := ioutil.ReadAll(f)
 		if err != nil {
-			response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Cannot read content of '%s' parameter: %s", rpath, err)))
+			sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot read content of '%s' parameter: %s", rpath, err))
 		}
 		fi, err := f.Stat()
 		if err != nil {
-			response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Cannot stat file '%s': %s", rpath, err)))
+			sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot stat file '%s': %s", rpath, err))
 		}
 		result.Content = string(cnt)
 		result.FileMode = uint32(fi.Mode())
@@ -153,7 +155,7 @@ func (serv *workspace) dir(request *restful.Request, response *restful.Response)
 func (serv *workspace) dircontent(pt string, request *restful.Request, response *restful.Response) {
 	path, rpath, err := serv.getPathFromRequest(pt)
 	if err != nil {
-		response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Illegal Path: %s", err)))
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Path: %s", err))
 		return
 	}
 
@@ -166,12 +168,12 @@ func (serv *workspace) dircontent(pt string, request *restful.Request, response 
 	}
 	f, err := os.Open(path)
 	if err != nil {
-		response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Cannot read '%s' parameter: %s", rpath, err)))
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot read '%s' parameter: %s", rpath, err))
 	} else {
 		defer f.Close()
 		flz, err := f.Readdir(-1)
 		if err != nil {
-			response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Cannot read contents of '%s': %s", rpath, err)))
+			sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot read contents of '%s': %s", rpath, err))
 		} else {
 			for _, fl := range flz {
 				result.Entries = append(result.Entries, DirEntry{fl.Name(), fl.IsDir()})
@@ -180,20 +182,54 @@ func (serv *workspace) dircontent(pt string, request *restful.Request, response 
 		}
 	}
 }
+func (serv *workspace) rmfile(request *restful.Request, response *restful.Response) {
+	path, rpath, err := serv.getPathFromRequest(request.QueryParameter("path"))
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Path: %s", err))
+		return
+	}
+	err = os.Remove(path)
+
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot rm dir: %s", err))
+		return
+	}
+	serv.dircontent(filepath.Join("/", rpath, ".."), request, response)
+}
 
 func (serv *workspace) createdir(request *restful.Request, response *restful.Response) {
-	path, _, err := serv.getPathFromRequest(request.QueryParameter("path"))
+	path, rpath, err := serv.getPathFromRequest(request.QueryParameter("path"))
 	if err != nil {
-		response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Illegal Path: %s", err)))
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Path: %s", err))
 		return
 	}
 	err = os.Mkdir(path, 0755)
 
 	if err != nil {
-		response.WriteEntity(restful.NewError(http.StatusBadRequest, fmt.Sprintf("Cannot create dir: %s", err)))
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot create dir: %s", err))
 		return
 	}
-	serv.dircontent(filepath.Join(path, ".."), request, response)
+	serv.dircontent(filepath.Join("/", rpath), request, response)
+}
+func (serv *workspace) touch(request *restful.Request, response *restful.Response) {
+	path, rpath, err := serv.getPathFromRequest(request.QueryParameter("path"))
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Path: %s", err))
+		return
+	}
+	f, err := os.Create(path)
+	defer f.Close()
+
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot create file: %s", err))
+		return
+	}
+	serv.dircontent(filepath.Join("/", rpath, ".."), request, response)
+}
+
+func sendError(response *restful.Response, status int, err error) {
+	response.WriteHeader(status)
+	response.WriteEntity(restful.NewError(status, fmt.Sprintf("%s", err)))
 }
 
 type workspace struct {

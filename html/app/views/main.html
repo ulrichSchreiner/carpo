@@ -1,5 +1,5 @@
-<div >
 
+<div >
 	<ul class="breadcrumb">
 		<li><i class="icon-folder-open"></i> <a class="pathEntry" ng-click="chabs(-1)" >Home</a></li>
 		<li ng-repeat="pe in workspace.pathentries"><span class="divider">/</span><a class="pathEntry" ng-click="chabs($index)" >{{pe}}</a></li>
@@ -13,13 +13,19 @@
 	<div id="dirEntries">
         <div ng-repeat="e in workspace.entries | orderBy:['-dir','name']">
           <i ng-show="e.dir" class="icon-folder-close"></i><i ng-hide="e.dir" class="icon-file"></i> <span ng-click="selectFileElement(e.name,e.dir)">{{e.name}}</span>
+				 <div class="dropdown" style="float:right;">
+				   <a class="dropdown-toggle"><i class="icon-remove"></i></a>
+					 <div style="padding:10px;text-align:center;" class="dropdown-menu"><div>Delete '{{e.name}}'?</div><button ng-click="deleteFileElement(e)" class="btn btn-success" type="button">Yes</button></div>
+				 </div>
         </div>
     </div>
 <div id="editor">
 <div style="line-height:25px; height:25px; position:relative;">
-	<button ng-repeat="f in openfiles" ng-class="{true:'btn btn-primary',false:'btn'}[f.path==currentfile.path]" class="btn" type="button" ng-click="selectFile(f)" title="{{f.path}}"><span ng-show="f.dirty">* </span>{{f.title}} <i ng-click="closeFile(f)" class="icon-remove"></i></button>
+	<button ng-repeat="f in openfiles" ng-class="{true:'btn btn-primary',false:'btn'}[f.path==currentfile.path]" class="btn" type="button" ng-click="selectFile(f)" title="{{f.path}}">
+		<span ng-show="f.dirty">* </span>{{f.title}} <i ng-click="closeFile(f)" class="icon-remove"></i>
+	</button>
 </div>
-<div ng-model="currentfile.content" ui-ace="{
+<div ng-show="currentfile!=null" ng-model="currentfile.content" ui-ace="{
   useWrapMode : true,
   showGutter: true,
   theme:'twilight',
@@ -29,4 +35,7 @@
 }"></div>
 </div>
 <pre id="output">{{currentfile.buildresult}}</pre>
+</div>
+<div style="position:absolute;bottom:0;width:100%;z-index:100;">
+  <alert ng-repeat="alert in alerts" type="alert.type" close="closeAlert($index)">{{alert.msg}}</alert>
 </div>
