@@ -42,6 +42,11 @@ angular.module('htmlApp')
  			callback(data);
  		});
  	};
+ 	service.createdir = function (pt, callback) {
+ 		$http.get("/workspace/createdir?path="+pt).then(function (data) {
+ 			callback(data);
+ 		});
+ 	};
 
  	service.file = function (pt, callback) {
  		$http.get("/workspace/file?path="+pt).then(function (data) {

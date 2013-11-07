@@ -25,6 +25,10 @@ body {
 	cursor:pointer;
 }
 
+#dirEntriesToolbar {
+	padding-left:10px;
+}
+
 #dirEntries {
 	margin-left:0px;
 	padding-left:10px;
@@ -33,7 +37,7 @@ body {
 	cursor:pointer;
 	position:absolute;
 	bottom:125px;
-	top: 40px;
+	top: 80px;
 	left: 0px;
 }
 

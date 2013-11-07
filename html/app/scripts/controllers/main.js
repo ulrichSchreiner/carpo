@@ -1,7 +1,7 @@
 'use strict';
 
 angular.module('htmlApp')
-  .controller('MainCtrl', function ($scope, $document, Workspaceservice, ace) {
+  .controller('MainCtrl', function ($scope, $document, Workspaceservice, ace, $modal) {
 
 	$scope.acemodes = {
 		".md":"markdown",
@@ -52,6 +52,27 @@ angular.module('htmlApp')
 		res.session = ace.createEditSession(f.content, mode.mode)
 		return res;
 	}
+
+	$scope.createFile = function () {
+	  var modalInstance = $modal.open({
+      	templateUrl: 'views/createFileElement.html',
+      	controller: 'CreatefileElementCtrl',
+		resolve: {
+           elementType: function() { return "File";},
+		  parentDir: function() { return $scope.data.cwd; }
+      	}
+    	  });
+
+      modalInstance.result.then(function (item) {
+        console.log("create File:",item);
+      }, function () {
+        console.log("create File dismissed");
+      });
+	};
+
+	$scope.createFolder = function () {
+
+	};
 
     $scope.chabs = function (idx) {
 		var dr = "/";

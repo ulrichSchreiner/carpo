@@ -4,7 +4,8 @@ angular.module('htmlApp', [
   'ngCookies',
   'ngResource',
   'ngSanitize',
-  'ui.ace'
+  'ui.ace',
+  'ui.bootstrap'
 ])
   .config(function ($routeProvider) {
     $routeProvider
