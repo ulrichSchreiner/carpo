@@ -318,8 +318,11 @@ angular.module('htmlApp')
 		"golang":$scope.parseOutput_golang
 	};
 	Workspaceservice.loadConfig().then (function (d) {
+            if (d.data != null && d.data.basedirectory != null  ) {
+              
 		$scope.config = d.data;
 		$scope.setRoot($scope.config.basedirectory);
+            }s
 		//$scope.chabs(0);
 	});
 
