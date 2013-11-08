@@ -3,27 +3,10 @@ body {
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     color: #333;
 }
-
 #content {
 	height: 100%;
 	width: 100%;
 	background:#fafafa;
-}
-.hero-unit {
-    margin: 50px auto 0 auto;
-    width: 300px;
-    font-size: 18px;
-    font-weight: 200;
-    line-height: 30px;
-    background-color: #eee;
-    border-radius: 6px;
-    padding: 60px;
-}
-
-.hero-unit h1 {
-    font-size: 60px;
-    line-height: 1;
-    letter-spacing: -1px;
 }
 
 .pathEntry {
@@ -42,7 +25,7 @@ body {
 	cursor:pointer;
 	position:absolute;
 	bottom:125px;
-	top: 80px;
+	top: 90px;
 	left: 0px;
 }
 
@@ -52,7 +35,7 @@ body {
 
 #editor {
 	position: absolute;
-	top: 40px;
+	top: 45px;
 	left:210px;
 	right: 0px;
 	bottom: 146px;

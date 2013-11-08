@@ -7,6 +7,7 @@ import (
 	"github.com/howeyc/fsnotify"
 	"github.com/ulrichSchreiner/carpo/golang"
 	"go/format"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -33,6 +34,8 @@ func (w *workspace) Register(container *restful.Container) {
 	ws.Route(ws.GET("/rm").To(w.rmfile).Writes(Dir{}))
 	ws.Route(ws.GET("/file").To(w.file).Writes(FileContent{}))
 	ws.Route(ws.POST("/save").To(w.save).Reads(FileSaveRequest{}).Writes(FileSaveResponse{}))
+	ws.Route(ws.POST("/saveConfig").To(w.saveConfig))
+	ws.Route(ws.GET("/loadConfig").To(w.loadConfig))
 	container.Add(&ws)
 }
 
@@ -65,6 +68,10 @@ type FileSaveResponse struct {
 	BuildResult      string `json:"buildresult"`
 	BuildType        string `json:"buildtype"`
 	FormattedContent string `json:"formattedcontent"`
+}
+
+type WorkspaceConfiguration struct {
+	BaseDirectory string `json:"basedirectory"`
 }
 
 /*
@@ -227,6 +234,47 @@ func (serv *workspace) touch(request *restful.Request, response *restful.Respons
 	serv.dircontent(filepath.Join("/", rpath, ".."), request, response)
 }
 
+func (serv *workspace) saveConfig(request *restful.Request, response *restful.Response) {
+	/*rq := new(WorkspaceConfiguration)
+	err := request.ReadEntity(&rq)
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Request: %s", err))
+		return
+	}
+	*/
+	f, err := os.Create(filepath.Join(serv.Path, ".carpo"))
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Error create config: %s", err))
+		return
+	}
+	defer f.Close()
+
+	io.Copy(f, request.Request.Body)
+	defer request.Request.Body.Close()
+	//enc := json.NewEncoder(f)
+	//enc.Encode(rq)
+}
+
+func (serv *workspace) loadConfig(request *restful.Request, response *restful.Response) {
+	f, err := os.Open(filepath.Join(serv.Path, ".carpo"))
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Error opening config: %s", err))
+		return
+	}
+	defer f.Close()
+	io.Copy(response, f)
+	/*
+		var conf WorkspaceConfiguration
+		enc := json.NewDecoder(f)
+
+		if err = enc.Decode(&conf); err != nil {
+			sendError(response, http.StatusBadRequest, fmt.Errorf("Error reading config: %s", err))
+			return
+		}
+		response.WriteEntity(conf)
+	*/
+}
+
 func sendError(response *restful.Response, status int, err error) {
 	response.WriteHeader(status)
 	response.WriteEntity(restful.NewError(status, fmt.Sprintf("%s", err)))
@@ -264,6 +312,7 @@ func NewWorkspace(path string) error {
 		path = filepath.Join(workdir, path)
 	}
 	w := workspace{path, nil, nil}
+
 	gopath, err := exec.LookPath("go")
 	if err != nil {
 		log.Printf("no go tool found in path: %s\n", err)

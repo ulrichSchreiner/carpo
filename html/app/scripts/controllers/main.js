@@ -19,18 +19,33 @@ angular.module('htmlApp')
 		console.log("global save:",event);
 		return false;
 	});
-
+	$scope.snapOpts = {
+		touchToDrag : false
+	};
 	var workspace = {};
 	workspace.entries = [];
 	workspace.path = "";
 	workspace.pathentries = [];
 	$scope.workspace = workspace;
 	$scope.data = {};
+	$scope.data.root = "";
+	$scope.data.rootpathentries = [];
 	$scope.data.cwd = "/";
 	$scope.openfiles = [];
 	$scope.alerts = [];
-	//$scope.currentfile = {};
 	$scope.currentfile = null;
+	$scope.config = {};
+
+	$scope.$watch("config", function(d) {
+		Workspaceservice.saveConfig($scope.config).then(function (e) {
+			//console.log("config saved:",e);
+			$scope._aceEditor.setFontSize($scope.config.fontSize);
+		});
+	}, true);
+
+	$scope.filterPathElement = function (pe) {
+		return pe != "."
+	};
 
 	$scope.addAlert = function(message) {
     		$scope.alerts.push({type:"error", msg: message});
@@ -63,10 +78,8 @@ angular.module('htmlApp')
 	}
 
 	$scope.deleteFileElement = function(f) {
-		Workspaceservice.rm($scope.data.cwd+f.name).then(function (d) {
-			for (var e in d.data) {
-				$scope.workspace[e] = d.data[e];
-			}
+		Workspaceservice.rm($scope.data.root+$scope.data.cwd+f.name).then(function (d) {
+			$scope.refreshWorkspaceWithFileElementResult(d.data);
 	    }, function(e) {
 			$scope.addAlert(e.data.Message);
 		});
@@ -78,12 +91,12 @@ angular.module('htmlApp')
       	controller: 'CreatefileElementCtrl',
 		resolve: {
            elementType: function() { return "File";},
-		  parentDir: function() { return $scope.data.cwd; }
+		  parentDir: function() { return $scope.data.root+$scope.data.cwd; }
       	}
     	  });
 
       modalInstance.result.then(function (item) {
-		var pt = $scope.data.cwd+item;
+		var pt = $scope.data.root+$scope.data.cwd+item;
 		Workspaceservice.createfile(pt,function (d) {
 			for (var e in d.data) {
 				$scope.workspace[e] = d.data[e];
@@ -98,12 +111,12 @@ angular.module('htmlApp')
       	controller: 'CreatefileElementCtrl',
 		resolve: {
            elementType: function() { return "Directory";},
-		  parentDir: function() { return $scope.data.cwd; }
+		  parentDir: function() { return $scope.data.root+$scope.data.cwd; }
       	}
     	  });
 
       modalInstance.result.then(function (item) {
-		var pt = $scope.data.cwd+item;
+		var pt = $scope.data.root+$scope.data.cwd+item;
 		Workspaceservice.createdir(pt,function (d) {
 			for (var e in d.data) {
 				$scope.workspace[e] = d.data[e];
@@ -138,7 +151,7 @@ angular.module('htmlApp')
 		}
 		$scope.openfiles = newItems;
 		if (newItems.length>0) {
-			selectFile(newItems[0]);
+			$scope.selectFile(newItems[0]);
 		} else {
 			//$scope.currentfile.content = null;
 			//$scope.currentfile.title = null;
@@ -166,7 +179,7 @@ angular.module('htmlApp')
 		});
 	}
 	$scope.openFile = function (f)  {
-		var fn = $scope.data.cwd+f;
+		var fn = $scope.data.root+$scope.data.cwd+f;
 		Workspaceservice.file(fn, function(d) {
 			var newItems = [];
 			var nf = null;
@@ -198,23 +211,56 @@ angular.module('htmlApp')
     			$scope.data.cwd = dr;
     		else
     			$scope.data.cwd = $scope.data.cwd + dr +"/";
-		Workspaceservice.dir($scope.data.cwd,function (d) {
-			for (var e in d.data) {
-				$scope.workspace[e] = d.data[e];
-			}
+		Workspaceservice.dir($scope.data.root+$scope.data.cwd,function (d) {
+			$scope.refreshWorkspaceWithFileElementResult(d.data);
 	    });
     };
+	$scope.refreshWorkspaceWithFileElementResult = function(r) {
+		for (var e in r) {
+			if (e == "pathentries")
+				$scope.workspace[e] = r[e].slice($scope.data.rootpathentries.length);
+			else
+				$scope.workspace[e] = r[e];
+		}
+	};
 	$scope.editorSettings = function () {
 		var modalInstance = $modal.open({
  	     	templateUrl: 'views/editorsettings.html',
  	     	controller: 'EditorSettingsCtrl',
 			resolve: {
+				config:function() {return $scope.config;}
  	     	}
-    	});
+	    });
 
-      modalInstance.result.then(function (item) {
-		console.log(item);
-      });		
+      	modalInstance.result.then(function (item) {
+			$scope.config.fontSize = item.fontSize;
+			$scope.config.hidefiles = item.hidefiles;
+			//console.log(item);
+      	});
+	};
+	$scope.displayFile = function (f) {
+		// hidden files: ^\..*
+		if ($scope.config.hidefiles != null && $scope.config.hidefiles!=="") {
+			return new RegExp($scope.config.hidefiles).exec(f.name) == null;
+		}
+		return true;
+	};
+	$scope.resetRoot = function() {
+		$scope.data.root = "";
+		$scope.data.rootpathentries = [];
+		$scope.data.cwd = "/";
+		$scope.selectFileElement("/",true);
+		$scope.config.basedirectory = $scope.data.root;
+	};
+	$scope.changeRoot = function() {
+		$scope.setRoot($scope.data.cwd.slice(0,-1));
+	};
+	$scope.setRoot = function(rt) {
+		$scope.data.root = rt;
+		$scope.data.rootpathentries = $scope.data.root.slice(1).split("/");
+		$scope.data.cwd = "/";
+		$scope.selectFileElement("/",true);
+		$scope.config.basedirectory = $scope.data.root;
 	};
 	$scope.aceLoaded = function(_editor) {
       // Options
@@ -271,6 +317,11 @@ angular.module('htmlApp')
 	$scope.outputParser = {
 		"golang":$scope.parseOutput_golang
 	};
+	Workspaceservice.loadConfig().then (function (d) {
+		$scope.config = d.data;
+		$scope.setRoot($scope.config.basedirectory);
+		//$scope.chabs(0);
+	});
 
     Workspaceservice.subscribe(handler);
     Workspaceservice.connect();

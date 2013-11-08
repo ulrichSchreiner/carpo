@@ -1,8 +1,10 @@
 'use strict';
 
 angular.module('htmlApp')
-  .controller('EditorSettingsCtrl', function ($scope,$modalInstance) {
+  .controller('EditorSettingsCtrl', function ($scope,$modalInstance,config) {
 	$scope.data = {
+		fontSize:config.fontSize,
+		hidefiles:config.hidefiles
 	};
 
 

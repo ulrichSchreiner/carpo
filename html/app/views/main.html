@@ -1,9 +1,25 @@
-<div id="content" snap-content>
+<div id="content" snap-content snap-options="snapOpts">
 <div >
-	<ul class="breadcrumb" >
+	<ul class="breadcrumb">
 		<li><i snap-toggle="left" class="icon-align-justify"></i><span class="divider"></span></li>
-		<li><i class="icon-folder-open"></i> <a class="pathEntry" ng-click="chabs(-1)" >Home</a></li>
-		<li ng-repeat="pe in workspace.pathentries"><span class="divider">/</span><a class="pathEntry" ng-click="chabs($index)" >{{pe}}</a></li>
+	  <li>
+			<div class="btn-group">
+			  <a class="btn" ng-click="chabs($index)"><i class="icon-folder-open"></i> {{data.root+"/"}}</a>
+			  <a class="btn dropdown-toggle" data-toggle="dropdown" href="#"><span class="caret"></span></a>
+			  <ul class="dropdown-menu">
+			    <li><a ng-click="resetRoot()">Reset</a></li>
+			  </ul>
+			</div>
+		</li>
+		<li ng-repeat="pe in workspace.pathentries | filter:filterPathElement">
+			<div class="btn-group">
+			  <a class="btn" ng-click="chabs($index)">{{pe}}</a>
+			  <a class="btn dropdown-toggle" data-toggle="dropdown" href="#"><span class="caret"></span></a>
+			  <ul class="dropdown-menu">
+			    <li><a ng-click="changeRoot($index)">Set as root</a></li>
+			  </ul>
+			</div>
+		</li>
 	</ul>
 	<div class="btn-toolbar" id="dirEntriesToolbar">
   <div class="btn-group">
@@ -12,7 +28,7 @@
   </div>
 </div>
 	<div id="dirEntries">
-        <div ng-repeat="e in workspace.entries | orderBy:['-dir','name']">
+        <div ng-repeat="e in workspace.entries | filter: displayFile | orderBy:['-dir','name']">
           <i ng-show="e.dir" class="icon-folder-close"></i><i ng-hide="e.dir" class="icon-file"></i> <span ng-click="selectFileElement(e.name,e.dir)">{{e.name}}</span>
 				 <div class="dropdown" style="float:right;">
 				   <a class="dropdown-toggle"><i class="icon-remove"></i></a>

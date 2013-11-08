@@ -67,5 +67,12 @@ angular.module('htmlApp')
  		});
  	};
 
+	service.saveConfig = function (cfg) {
+		return $http.post("/workspace/saveConfig", angular.toJson(cfg));
+	};
+	service.loadConfig = function () {
+		return $http.get("/workspace/loadConfig");
+	}
+
 	return service;
   });

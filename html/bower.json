@@ -12,10 +12,13 @@
     "angular-sanitize": "~1.0.7",
     "angular-ui-ace": "~0.0.4",
     "angular-bootstrap": "~0.6.0",
-	"angular-snap":"latest"
+    "angular-snap": "latest"
   },
   "devDependencies": {
     "angular-mocks": "~1.0.7",
     "angular-scenario": "~1.0.7"
+  },
+  "resolutions": {
+    "angular": "1.0.8"
   }
 }

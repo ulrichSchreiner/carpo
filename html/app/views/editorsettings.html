@@ -6,11 +6,15 @@
 <div class="modal-body">
   <form class="form-horizontal">
 	<div class="control-group">
-	  <label class="control-label" for="inputEmail">Email</label>
-      <div class="controls">
-        <input type="text" id="inputEmail" placeholder="Email">
-      </div>
+	  <label class="control-label" for="editorFontSize">Fontsize</label>
+    <div class="controls">
+      <input type="number" min="8" step="1" id="editorFontSize" placeholder="Font size" ng-model="data.fontSize">
     </div>
+	  <label class="control-label" for="editorHideFiles">Hide Files</label>
+    <div class="controls">
+      <input type="text" id="editorHideFiles" placeholder="editorHideFiles" ng-model="data.hidefiles">
+    </div>
+  </div>
   </form>
 </div>
 <div class="modal-footer">
