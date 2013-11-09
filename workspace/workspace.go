@@ -6,6 +6,7 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/howeyc/fsnotify"
 	"github.com/ulrichSchreiner/carpo/golang"
+	"github.com/ulrichSchreiner/carpo/workspace/builder"
 	"go/format"
 	"io"
 	"io/ioutil"
@@ -63,11 +64,12 @@ type FileSaveRequest struct {
 	Build   bool   `json:"build"`
 }
 type FileSaveResponse struct {
-	Ok               bool   `json:"ok"`
-	Message          string `json:"message"`
-	BuildResult      string `json:"buildresult"`
-	BuildType        string `json:"buildtype"`
-	FormattedContent string `json:"formattedcontent"`
+	Ok               bool                  `json:"ok"`
+	Message          string                `json:"message"`
+	BuildResult      string                `json:"buildresult"`
+	BuildType        string                `json:"buildtype"`
+	BuildOutput      []builder.BuildResult `json:"buildoutput"`
+	FormattedContent string                `json:"formattedcontent"`
 }
 
 type WorkspaceConfiguration struct {
@@ -110,7 +112,7 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 	fn := filepath.Base(path)
 	fp := filepath.Dir(path)
 	golang.Parse(string(src), fn)
-	fres := FileSaveResponse{true, "File saved", "", "", string(src)}
+	fres := FileSaveResponse{true, "File saved", "", "", []builder.BuildResult{}, string(src)}
 	if rq.Build {
 		if strings.HasSuffix(strings.ToLower(fn), ".go") {
 			if serv.gotool != nil {
@@ -119,6 +121,7 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 				cmd.Dir = fp
 				res, _ := cmd.CombinedOutput()
 				fres.BuildResult = string(res)
+				fres.BuildOutput = builder.BuildGoPackage(serv.Path, serv.Path, *serv.gotool, fp)
 			} else {
 				fres.BuildResult = fmt.Sprintf("<error no 'go' tool available in path")
 			}

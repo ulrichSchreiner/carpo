@@ -3,20 +3,9 @@
 angular.module('htmlApp')
   .controller('MainCtrl', function ($scope, $document, Workspaceservice, ace, $modal) {
 
-	$scope.acemodes = {
-		".md":"markdown",
-		".go":"golang",
-		".js":"javascript",
-		".html":"html",
-		".xml":"xml",
-		".yaml":"yaml"
-	};
 	$document.keydown(function(event) {
-
 		if (!( String.fromCharCode(event.which).toLowerCase() == 's' && event.ctrlKey) && !(event.which == 19)) return true;
-		//alert("Ctrl-s pressed");
 		event.preventDefault();
-		console.log("global save:",event);
 		return false;
 	});
 	$scope.snapOpts = {
@@ -35,7 +24,9 @@ angular.module('htmlApp')
 	$scope.alerts = [];
 	$scope.currentfile = null;
 	$scope.config = {};
-
+    $scope.problems = {};
+    $scope.problems.errors = [];
+    
 	$scope.$watch("config", function(d) {
 		Workspaceservice.saveConfig($scope.config).then(function (e) {
 			//console.log("config saved:",e);
@@ -48,7 +39,7 @@ angular.module('htmlApp')
 	};
 
 	$scope.addAlert = function(message) {
-    		$scope.alerts.push({type:"error", msg: message});
+        $scope.alerts.push({type:"error", msg: message});
 	};
 
 	$scope.closeAlert = function(index) {
@@ -64,14 +55,7 @@ angular.module('htmlApp')
 		res.mode = f.filemode;
 		res.dirty = false;
 		res.buildresult = "";
-		res.type = "text";
-		var fn = f.title.toLowerCase();
-		if (fn != null) {
-			var suffix = fn.split(".");
-			var tp = $scope.acemodes["."+suffix[suffix.length-1]];
-			if (tp != null)
-				res.type = tp;
-		}
+		
 		var mode = ace.require("ace/ext/modelist").getModeForPath(f.title);
 		res.session = ace.createEditSession(f.content, mode.mode)
 		return res;
@@ -135,6 +119,7 @@ angular.module('htmlApp')
 	$scope.selectFile = function(f) {
 		$scope.currentfile = f;
 		$scope._aceEditor.setSession(f.session);
+        $scope.showAnnotations(f, $scope.problems.errors);
 	};
 
 	$scope.closeFile = function (f) {
@@ -170,17 +155,17 @@ angular.module('htmlApp')
 					pos = $scope._aceEditor.getCursorPosition();
 				f.session.setValue(d.data.formattedcontent);
 				f.content = d.data.formattedcontent;
-				if (pos != null)
+				if (pos != null) {
 					$scope._aceEditor.moveCursorToPosition(pos);
-				var p = $scope.outputParser[d.data.buildtype];
-				if (p != null)
-					p(f, d.data.buildresult);
+                    $scope._aceEditor.scrollToLine(pos.row, true, false, function() {});
+				}
+                $scope.pushOutput(f, d.data.buildoutput);
+                $scope.showAnnotations(f, $scope.problems.errors);
 			}
 		});
 	}
-	$scope.openFile = function (f)  {
-		var fn = $scope.data.root+$scope.data.cwd+f;
-		Workspaceservice.file(fn, function(d) {
+    $scope.openFilePath = function (fn, cb) {
+    	Workspaceservice.file(fn, function(d) {
 			var newItems = [];
 			var nf = null;
 			for (var i=0; i<$scope.openfiles.length; i++) {
@@ -192,6 +177,8 @@ angular.module('htmlApp')
 					nf = fl;
 					nf.content = d.data.content;
 					$scope.selectFile(nf);
+                    if (cb != null)
+                        cb(nf);
 					return;
 				}
 			}
@@ -200,7 +187,13 @@ angular.module('htmlApp')
 			newItems.push(nf);
 			$scope.openfiles = newItems;
 			$scope.selectFile(nf);
-		});
+            if (cb != null)
+                cb(nf);
+		});        
+    };
+	$scope.openFile = function (f)  {
+		var fn = $scope.data.root+$scope.data.cwd+f;
+        $scope.openFilePath(fn);
 	};
     $scope.selectFileElement = function (dr,isdir) {
 		if (!isdir) {
@@ -293,36 +286,51 @@ angular.module('htmlApp')
 	    	}
 	};
 	// build output parsers
-	$scope.parseOutput_golang = function (f, res) {
+	$scope.showAnnotations = function (f, probs) {
 		var fname = f.title;
-		f.session.clearAnnotations();
-		var lines = res.split("\n");
-		if (lines.length<1) return;
-		//var compOutput = new RegExp("(\\./"+fname+"?):(\\d*):(.*)");
-		var compOutput = new RegExp("("+fname+"?):(\\d*):(.*)");
-		var annotations = [];
-		for (var i=1;i<lines.length; i++) {
-			var m = compOutput.exec(lines[i]);
-			if (m != null) {
-				annotations.push({
-                  row: parseInt(m[2])-1,
-                  column: 0,
-                  text: m[3],
-                  type: "error"
+        var annotations = [];
+        angular.forEach(probs, function(p,i) {
+            if (f.path == p.file) {
+                this.push({
+                   row:p.line-1,
+                   column:0,
+                   text:p.message,
+                   type:"error"
                 });
-			}
-		}
-		f.session.setAnnotations(annotations);
+            }
+        }, annotations);
+        
+        f.session.clearAnnotations();
+        f.session.setAnnotations(annotations);
 	};
-	$scope.outputParser = {
-		"golang":$scope.parseOutput_golang
-	};
+    
+    $scope.pushOutput = function (fl, output) {
+        var np = [];
+        // first filter out all problems from "fl"
+        angular.forEach($scope.problems.errors, function(p,i) {
+            if (fl.path != p.file)
+                this.push(p);
+        }, np);
+        angular.forEach(output, function(p, i) {
+            this.push(p);
+        }, np);
+        $scope.problems.errors = np;    
+    };
+    $scope.jumpTo = function (msg) {
+      $scope.openFilePath(msg.file, function (nf) {
+        var pos = {row:msg.line,col:0};
+        //$scope._aceEditor.moveCursorToPosition(pos);
+        $scope._aceEditor.gotoLine(pos.row, 0, false);
+        $scope._aceEditor.scrollToLine(pos.row, true, false, function() {});
+        $scope._aceEditor.focus();
+      });      
+    };
 	Workspaceservice.loadConfig().then (function (d) {
             if (d.data != null && d.data.basedirectory != null  ) {
               
 		$scope.config = d.data;
 		$scope.setRoot($scope.config.basedirectory);
-            }s
+            }
 		//$scope.chabs(0);
 	});
 

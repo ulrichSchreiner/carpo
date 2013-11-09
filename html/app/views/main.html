@@ -51,7 +51,20 @@
   onChange: aceChanged
 }"></div>
 </div>
-<pre id="output">{{currentfile.buildresult}}</pre>
+<div id="output">
+  <table class="table table-condensed">
+      <thead>
+          <tr><th>Source</th><th>Line</th><th>Message</th></tr>
+      </thead>
+      <tbody>
+          <tr ng-repeat="e in problems.errors" ng-click="jumpTo(e)">
+              <td>{{e.source}}</td>
+              <td>{{e.line}}</td>
+              <td>{{e.message}}</td>
+          </tr>
+      </tbody>
+  </table>
+</div>
 </div>
 <div style="position:absolute;bottom:0;width:100%;z-index:100;">
   <alert ng-repeat="alert in alerts" type="alert.type" close="closeAlert($index)">{{alert.msg}}</alert>
