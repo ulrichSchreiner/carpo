@@ -1,44 +1,60 @@
 package client
 
 import (
-	"fmt"
+	"archive/zip"
+	"bytes"
+	"io"
+	"log"
+	"mime"
 	"net/http"
+	"os"
+	"os/exec"
+	"path"
 )
 
-var index_html = `
-<html ng-app>
-<head>
-<script src="http://code.angularjs.org/1.2.0-rc.3/angular.min.js"></script>
-<title>Test</title>
-</head>
-<script>
-var h = window.location.hostname;
-var p = window.location.port;
-var prot = window.location.protocol=="http:" ? "ws://" : "wss://";
-
-var ws = new WebSocket(prot+h+":"+p+"/workspace");
-
-ws.onopen = function (){
-	console.log("on open");
-}
-ws.onmessage = function(evt) {
-	console.log("message: ",evt);
-}
-ws.onclose = function () {
-	console.log("on close");
-}
-</script>
-<body>
-Test Body
-</body>
-</html>`
-
-func xinit() {
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, index_html)
-	})
-}
+var resources *zip.ReadCloser
 
 func Init(cp string) {
-	http.Handle("/", http.FileServer(http.Dir(cp)))
+	//http.Handle("/", http.FileServer(http.Dir(cp)))
+}
+
+func InitResources() {
+	resources, err := zip.OpenReader(os.Args[0])
+	if err != nil {
+		mypath, err := exec.LookPath(os.Args[0])
+		if err != nil {
+			log.Fatal(err)
+		} else {
+			resources, err = zip.OpenReader(mypath)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
+	entries := make(map[string]*zip.File)
+	for _, f := range resources.File {
+		entries["/"+f.Name] = f
+	}
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		pt := r.URL.Path
+		if bytes.Compare([]byte(pt), []byte("/")) == 0 {
+			pt = "/index.html"
+		}
+		zf := entries[pt]
+		if zf == nil {
+			http.NotFound(w, r)
+			return
+		}
+		mimetype := mime.TypeByExtension(path.Ext(pt))
+		if mimetype != "" {
+			w.Header().Set("Content-Type", mimetype)
+		}
+		rc, err := zf.Open()
+		if err != nil {
+			log.Printf("Error opening zip entry: %s", err)
+		} else {
+			defer rc.Close()
+			io.Copy(w, rc)
+		}
+	})
 }

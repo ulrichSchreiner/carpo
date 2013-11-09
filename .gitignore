@@ -3,3 +3,4 @@ html/dist
 html/.tmp
 html/.sass-cache
 html/app/bower_components
+cmd/dist

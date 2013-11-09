@@ -26,6 +26,7 @@ func main() {
 		ws = &wd
 	}
 	client.Init(*clientpath)
+	client.InitResources()
 	err := workspace.NewWorkspace(*ws)
 	if err != nil {
 		log.Fatal(err)

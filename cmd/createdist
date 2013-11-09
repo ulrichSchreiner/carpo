@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+rm dist/carpo
+go build -o dist/carpo_raw
+cd ../html/app
+zip -r ../../cmd/dist/app.zip *
+cd ../../cmd/dist
+cat carpo_raw app.zip > carpo
+zip -A carpo
+chmod 755 carpo
+
