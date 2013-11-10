@@ -66,7 +66,6 @@ type FileSaveRequest struct {
 type FileSaveResponse struct {
 	Ok               bool                  `json:"ok"`
 	Message          string                `json:"message"`
-	BuildResult      string                `json:"buildresult"`
 	BuildType        string                `json:"buildtype"`
 	BuildOutput      []builder.BuildResult `json:"buildoutput"`
 	FormattedContent string                `json:"formattedcontent"`
@@ -112,21 +111,13 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 	fn := filepath.Base(path)
 	fp := filepath.Dir(path)
 	golang.Parse(string(src), fn)
-	fres := FileSaveResponse{true, "File saved", "", "", []builder.BuildResult{}, string(src)}
+	fres := FileSaveResponse{true, "File saved", "", []builder.BuildResult{}, string(src)}
 	if rq.Build {
 		if strings.HasSuffix(strings.ToLower(fn), ".go") {
 			if serv.gotool != nil {
 				fres.BuildType = BUILD_GOLANG
-				cmd := exec.Command(*serv.gotool, "build")
-				cmd.Dir = fp
-				res, _ := cmd.CombinedOutput()
-				fres.BuildResult = string(res)
 				fres.BuildOutput = builder.BuildGoPackage(serv.Path, serv.Path, *serv.gotool, fp)
-			} else {
-				fres.BuildResult = fmt.Sprintf("<error no 'go' tool available in path")
 			}
-		} else {
-			fres.BuildResult = "<no go file saved>"
 		}
 	}
 	response.WriteEntity(fres)
@@ -315,6 +306,7 @@ func NewWorkspace(path string) error {
 		path = filepath.Join(workdir, path)
 	}
 	w := workspace{path, nil, nil}
+	builder.Scan([]string{path})
 
 	gopath, err := exec.LookPath("go")
 	if err != nil {

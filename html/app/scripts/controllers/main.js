@@ -54,7 +54,6 @@ angular.module('htmlApp')
 		res.content = f.content;
 		res.mode = f.filemode;
 		res.dirty = false;
-		res.buildresult = "";
 		
 		var mode = ace.require("ace/ext/modelist").getModeForPath(f.title);
 		res.session = ace.createEditSession(f.content, mode.mode)
@@ -149,7 +148,6 @@ angular.module('htmlApp')
 		Workspaceservice.save(doc, function(d) {
 			if (d.data.ok) {
 				f.dirty = false;
-				f.buildresult = d.data.buildresult;
 				var pos = null;
 				if (f.session = $scope._aceEditor.getSession())
 					pos = $scope._aceEditor.getCursorPosition();

@@ -15,7 +15,7 @@ import (
 var resources *zip.ReadCloser
 
 func Init(cp string) {
-	//http.Handle("/", http.FileServer(http.Dir(cp)))
+	http.Handle("/", http.FileServer(http.Dir(cp)))
 }
 
 func InitResources() {
