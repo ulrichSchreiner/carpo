@@ -26,10 +26,14 @@ func Parse(source string, fname string) (*Syntax, error) {
 	fset := token.NewFileSet()
 	fs, err := parser.ParseFile(fset, fname, source, 0)
 	if err != nil {
-		fmt.Printf("ERROR: %v\n", err)
+		fmt.Printf("-> ERROR: %v\n", err)
+		if fs != nil {
+			ast.Print(fset, fs)
+		}
 		return nil, err
 	}
 	ast.Inspect(fs, r.visit)
+	ast.Print(fset, fs)
 	fmt.Printf("PACKAGE: %s\n", r.Contents.Name.Name)
 	for _, i := range r.Contents.Imports {
 		if i != nil {
