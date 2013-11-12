@@ -291,7 +291,7 @@ angular.module('htmlApp')
             if (f.path == p.file) {
                 this.push({
                    row:p.line-1,
-                   column:0,
+                   column:p.column,
                    text:p.message,
                    type:"error"
                 });
@@ -305,8 +305,9 @@ angular.module('htmlApp')
     $scope.pushOutput = function (fl, output) {
         var np = [];
         // first filter out all problems from "fl"
+        var dirname = $scope.dirname(fl.path);
         angular.forEach($scope.problems.errors, function(p,i) {
-            if (fl.path != p.file)
+            if (dirname != p.directory)
                 this.push(p);
         }, np);
         angular.forEach(output, function(p, i) {
@@ -322,6 +323,10 @@ angular.module('htmlApp')
         $scope._aceEditor.scrollToLine(pos.row, true, false, function() {});
         $scope._aceEditor.focus();
       });      
+    };
+    $scope.dirname = function(pt) {
+      var parts = pt.split("/");
+      return parts.slice(0,-1).join("/");
     };
 	Workspaceservice.loadConfig().then (function (d) {
             if (d.data != null && d.data.basedirectory != null  ) {

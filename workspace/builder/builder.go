@@ -19,11 +19,13 @@ var (
 )
 
 type BuildResult struct {
-	Original string `json:"original"`
-	File     string `json:"file"`
-	Source   string `json:"source"`
-	Line     int    `json:"line"`
-	Message  string `json:"message"`
+	Original  string `json:"original"`
+	File      string `json:"file"`
+	Directory string `json:"directory"`
+	Source    string `json:"source"`
+	Line      int    `json:"line"`
+	Column    int    `json:"column"`
+	Message   string `json:"message"`
 }
 
 type GoWorkspace struct {
@@ -80,7 +82,7 @@ func Scan(gopath []string) *GoWorkspace {
 }
 
 func BuildGoPackage(base string, gopath string, gotool string, packdir string) []BuildResult {
-	cmd := exec.Command(gotool, "build")
+	cmd := exec.Command(gotool, "install")
 	cmd.Dir = packdir
 	cmd.Env = []string{fmt.Sprintf("GOPATH=%s", gopath)}
 	res, _ := cmd.CombinedOutput()
@@ -104,6 +106,7 @@ func parseBuildOutput(base string, packdir string, output string) []BuildResult 
 			} else {
 				br.File = "/" + rel
 			}
+			br.Directory = filepath.Dir(br.File)
 			br.Message = string(m[len(m)-1])
 			sourceline := strings.Split(string(m[2]), ":")[0]
 			ln, err := strconv.ParseInt(sourceline, 10, 0)
