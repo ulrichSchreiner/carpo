@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/emicklei/go-restful"
 	"github.com/howeyc/fsnotify"
-	"github.com/ulrichSchreiner/carpo/golang"
+	_ "github.com/ulrichSchreiner/carpo/golang"
 	"github.com/ulrichSchreiner/carpo/workspace/builder"
 	"go/format"
 	"io"
@@ -110,13 +110,19 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 	}
 	fn := filepath.Base(path)
 	fp := filepath.Dir(path)
-	golang.Parse(string(src), fn)
+	//golang.Parse(string(src), fn)
 	fres := FileSaveResponse{true, "File saved", "", []builder.BuildResult{}, string(src)}
 	if rq.Build {
 		if strings.HasSuffix(strings.ToLower(fn), ".go") {
 			if serv.gotool != nil {
 				fres.BuildType = BUILD_GOLANG
-				fres.BuildOutput = builder.BuildGoPackage(serv.Path, serv.Path, *serv.gotool, fp)
+				output, err := serv.goworkspace.BuildPackage(serv.Path, *serv.gotool, fp)
+				if err != nil {
+					log.Printf("ERROR: %s\n", err)
+					//fres.BuildOutput = string(err)
+				} else {
+					fres.BuildOutput = *output
+				}
 			}
 		}
 	}
@@ -275,9 +281,10 @@ func sendError(response *restful.Response, status int, err error) {
 }
 
 type workspace struct {
-	Path    string
-	Watcher *fsnotify.Watcher
-	gotool  *string
+	Path        string
+	Watcher     *fsnotify.Watcher
+	gotool      *string
+	goworkspace *builder.GoWorkspace
 }
 
 type fileevent struct {
@@ -305,8 +312,8 @@ func NewWorkspace(path string) error {
 
 		path = filepath.Join(workdir, path)
 	}
-	w := workspace{path, nil, nil}
-	builder.Scan([]string{path})
+	gws := builder.Scan([]string{path})
+	w := workspace{path, nil, nil, gws}
 
 	gopath, err := exec.LookPath("go")
 	if err != nil {
