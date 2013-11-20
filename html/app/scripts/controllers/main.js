@@ -11,6 +11,14 @@ angular.module('htmlApp')
 	$scope.snapOpts = {
 		touchToDrag : false
 	};
+    $scope.gridOptions = {
+        data: [],
+        enablePinning: true,
+        columnDefs: [{ field: "source", width: 120, pinned: true },
+                    { field: "line", width: 120 },
+                    { field: "message", width: 520 }]
+    };
+    
 	var workspace = {};
 	workspace.entries = [];
 	workspace.path = "";
@@ -26,7 +34,10 @@ angular.module('htmlApp')
 	$scope.config = {};
     $scope.problems = {};
     $scope.problems.errors = [];
-    
+    $scope.$watch("problems.errors", function(e) {
+       $scope.gridOptions.data = $scope.problems.errors; 
+       console.log("grid data:",$scope.gridOptions.data);
+    });
 	$scope.$watch("config", function(d) {
 		Workspaceservice.saveConfig($scope.config).then(function (e) {
 			//console.log("config saved:",e);
@@ -157,7 +168,7 @@ angular.module('htmlApp')
 					$scope._aceEditor.moveCursorToPosition(pos);
                     $scope._aceEditor.scrollToLine(pos.row, true, false, function() {});
 				}
-                $scope.pushOutput(f, d.data.buildoutput);
+                $scope.pushOutput(f, d.data);
                 $scope.showAnnotations(f, $scope.problems.errors);
 			}
 		});
@@ -302,12 +313,22 @@ angular.module('htmlApp')
         f.session.setAnnotations(annotations);
 	};
     
-    $scope.pushOutput = function (fl, output) {
+    $scope.pushOutput = function (fl, data) {
+        var output = data.buildoutput;
         var np = [];
         // first filter out all problems from "fl"
         var dirname = $scope.dirname(fl.path);
+        var packs = {};
+        // index the output by the directory
+        angular.forEach (data.builtDirectories, function (e) {
+            this["/"+e] = e;
+        }, packs);
+        
         angular.forEach($scope.problems.errors, function(p,i) {
-            if (dirname != p.directory)
+            // don't clear this error, if the server did not compile
+            // this package/directory
+            if (packs[p.directory] == null)
+            //if (dirname != p.directory)
                 this.push(p);
         }, np);
         angular.forEach(output, function(p, i) {

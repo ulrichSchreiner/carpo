@@ -48,6 +48,11 @@ func (ws *GoWorkspace) findPackageFromDirectory(dir string) (string, error) {
 	}
 	return "", fmt.Errorf("Directory '%s' not found in GOPATH (%+v)", dir, ws.GoPath)
 }
+
+func (ws *GoWorkspace) findDirectoryFromPackage(p string) string {
+	return filepath.Join("src", p)
+}
+
 func (ws *GoWorkspace) addDependency(p *build.Package, needs []string) {
 	ws.dependencies[p.ImportPath] = needs
 }
@@ -88,9 +93,6 @@ func (src *srcDir) walker(path string, info os.FileInfo, err error) error {
 						log.Printf("import error: %s, %+v\n", err, pack)
 					} else {
 						if bytes.Compare([]byte(pack.Name), []byte("main")) != 0 {
-							log.Printf("found package '%s' in dir '%s'\n", pack.Name, pack.ImportPath)
-							log.Printf("go files in package: %+v\n", pack.GoFiles)
-							log.Printf("imports of package: %+v\n", pack.Imports)
 							src.ws.Packages[packname] = pack
 							src.ws.addDependency(pack, pack.Imports)
 						}
@@ -119,24 +121,28 @@ func Scan(gopath []string) *GoWorkspace {
 	return g
 }
 
-func (ws *GoWorkspace) BuildPackage(base string, gotool string, packdir string) (*[]BuildResult, error) {
+func (ws *GoWorkspace) BuildPackage(base string, gotool string, packdir string) (*[]BuildResult, *[]string, error) {
 	args := []string{"install"}
+	dirs := []string{}
 	pack, err := ws.findPackageFromDirectory(packdir)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	args = append(args, pack)
+	dirs = append(dirs, ws.findDirectoryFromPackage(pack))
 	deps, ok := ws.neededBy[pack]
 	if ok {
 		args = append(args, deps...)
+		for _, d := range deps {
+			dirs = append(dirs, ws.findDirectoryFromPackage(d))
+		}
 	}
-	log.Printf("compile args: %+v\n", args)
 	cmd := exec.Command(gotool, args...)
 	cmd.Dir = packdir
 	cmd.Env = []string{fmt.Sprintf("GOPATH=%s", ws.context.GOPATH)}
 	res, _ := cmd.CombinedOutput()
 	parsed := parseBuildOutput(base, packdir, string(res))
-	return &parsed, nil
+	return &parsed, &dirs, nil
 }
 
 func parseBuildOutput(base string, packdir string, output string) []BuildResult {

@@ -67,6 +67,7 @@ type FileSaveResponse struct {
 	Ok               bool                  `json:"ok"`
 	Message          string                `json:"message"`
 	BuildType        string                `json:"buildtype"`
+	BuiltDirectories []string              `json:"builtDirectories"`
 	BuildOutput      []builder.BuildResult `json:"buildoutput"`
 	FormattedContent string                `json:"formattedcontent"`
 }
@@ -111,17 +112,18 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 	fn := filepath.Base(path)
 	fp := filepath.Dir(path)
 	//golang.Parse(string(src), fn)
-	fres := FileSaveResponse{true, "File saved", "", []builder.BuildResult{}, string(src)}
+	fres := FileSaveResponse{true, "File saved", "", []string{}, []builder.BuildResult{}, string(src)}
 	if rq.Build {
 		if strings.HasSuffix(strings.ToLower(fn), ".go") {
 			if serv.gotool != nil {
 				fres.BuildType = BUILD_GOLANG
-				output, err := serv.goworkspace.BuildPackage(serv.Path, *serv.gotool, fp)
+				output, dirs, err := serv.goworkspace.BuildPackage(serv.Path, *serv.gotool, fp)
 				if err != nil {
 					log.Printf("ERROR: %s\n", err)
 					//fres.BuildOutput = string(err)
 				} else {
 					fres.BuildOutput = *output
+					fres.BuiltDirectories = *dirs
 				}
 			}
 		}
