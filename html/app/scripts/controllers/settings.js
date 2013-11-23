@@ -16,13 +16,21 @@ angular.module('htmlApp')
 	  $modalInstance.dismiss('cancel');
 	};
   })
-  .controller('LibrarySettingsCtrl', function ($scope,$modalInstance) {
+  .controller('ToolsSettingsCtrl', function ($scope,$modalInstance,config) {
+    $scope.apptypes = {
+        gotool:"Standard Go",
+        goapptool:"Appengine"
+    };
 	$scope.data = {
+        gotool:config.gotool,
+        goapptool:config.goapptool,
+        apptype:config.apptype
 	};
 
 
 	$scope.ok = function () {
-	  $modalInstance.close($scope.data);
+        console.log($scope.data);
+	    $modalInstance.close($scope.data);
 	};
 
 	$scope.cancel = function () {

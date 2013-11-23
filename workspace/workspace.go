@@ -62,6 +62,7 @@ type FileSaveRequest struct {
 	Content string `json:"content"`
 	Mode    uint32 `json:"mode"`
 	Build   bool   `json:"build"`
+	Builder string `json:"builder"`
 }
 type FileSaveResponse struct {
 	Ok               bool                  `json:"ok"`
@@ -115,9 +116,10 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 	fres := FileSaveResponse{true, "File saved", "", []string{}, []builder.BuildResult{}, string(src)}
 	if rq.Build {
 		if strings.HasSuffix(strings.ToLower(fn), ".go") {
-			if serv.gotool != nil {
+			builder := findBuilder(rq.Builder, serv.gotool)
+			if builder != nil {
 				fres.BuildType = BUILD_GOLANG
-				output, dirs, err := serv.goworkspace.BuildPackage(serv.Path, *serv.gotool, fp)
+				output, dirs, err := serv.goworkspace.BuildPackage(serv.Path, *builder, fp)
 				if err != nil {
 					log.Printf("ERROR: %s\n", err)
 					//fres.BuildOutput = string(err)
@@ -130,6 +132,16 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 	}
 	response.WriteEntity(fres)
 }
+func findBuilder(userpath string, system *string) *string {
+	if len(userpath) > 0 {
+		return &userpath
+	}
+	if system != nil {
+		return system
+	}
+	return nil
+}
+
 func (serv *workspace) file(request *restful.Request, response *restful.Response) {
 	path, rpath, err := serv.getPathFromRequest(request.QueryParameter("path"))
 	if err != nil {

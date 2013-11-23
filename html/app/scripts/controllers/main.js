@@ -32,6 +32,7 @@ angular.module('htmlApp')
 	$scope.alerts = [];
 	$scope.currentfile = null;
 	$scope.config = {};
+    $scope.config.hidefiles = '^\\..*';
     $scope.problems = {};
     $scope.problems.errors = [];
     $scope.$watch("problems.errors", function(e) {
@@ -155,7 +156,11 @@ angular.module('htmlApp')
 	};
 
 	$scope.saveFile = function (f) {
-		var doc = {path:f.path, content:f.session.getValue(), mode:f.mode, build:true};
+        var builder = $scope.config.apptype;
+        if (builder != null) {
+            builder = $scope.config[builder];
+        }
+		var doc = {path:f.path, content:f.session.getValue(), mode:f.mode, build:true, builder:builder};
 		Workspaceservice.save(doc, function(d) {
 			if (d.data.ok) {
 				f.dirty = false;
@@ -171,6 +176,9 @@ angular.module('htmlApp')
                 $scope.pushOutput(f, d.data);
                 $scope.showAnnotations(f, $scope.problems.errors);
 			}
+            else {
+                $scope.addAlert(d.data.message);
+            }
 		});
 	}
     $scope.openFilePath = function (fn, cb) {
@@ -225,6 +233,22 @@ angular.module('htmlApp')
 				$scope.workspace[e] = r[e];
 		}
 	};
+    $scope.toolsSettings = function () {
+    	var modalInstance = $modal.open({
+ 	     	templateUrl: 'views/tools.html',
+ 	     	controller: 'ToolsSettingsCtrl',
+			resolve: {
+				config:function() {return $scope.config;}
+ 	     	}
+	    });
+
+      	modalInstance.result.then(function (item) {
+			$scope.config.gotool = item.gotool;
+			$scope.config.goapptool = item.goapptool;
+            $scope.config.apptype = item.apptype;
+      	});
+    };
+    
 	$scope.editorSettings = function () {
 		var modalInstance = $modal.open({
  	     	templateUrl: 'views/editorsettings.html',
@@ -350,10 +374,9 @@ angular.module('htmlApp')
       return parts.slice(0,-1).join("/");
     };
 	Workspaceservice.loadConfig().then (function (d) {
-            if (d.data != null && d.data.basedirectory != null  ) {
-              
-		$scope.config = d.data;
-		$scope.setRoot($scope.config.basedirectory);
+            if (d.data !== null && d.data.basedirectory !== null  ) {              
+                $scope.config = d.data;
+                $scope.setRoot($scope.config.basedirectory);
             }
 		//$scope.chabs(0);
 	});

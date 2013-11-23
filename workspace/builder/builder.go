@@ -140,7 +140,14 @@ func (ws *GoWorkspace) BuildPackage(base string, gotool string, packdir string) 
 	cmd := exec.Command(gotool, args...)
 	cmd.Dir = packdir
 	cmd.Env = []string{fmt.Sprintf("GOPATH=%s", ws.context.GOPATH)}
-	res, _ := cmd.CombinedOutput()
+	res, err := cmd.CombinedOutput()
+	if err != nil {
+		// check if the command resulted with an error-exit code
+		if _, ok := err.(*exec.ExitError); !ok {
+			// no Exit-Error --> a fundamental problem occured
+			return nil, nil, err
+		}
+	}
 	parsed := parseBuildOutput(base, packdir, string(res))
 	return &parsed, &dirs, nil
 }
