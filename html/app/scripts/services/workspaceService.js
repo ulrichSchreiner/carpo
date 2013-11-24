@@ -72,7 +72,9 @@ angular.module('htmlApp')
 	};
 	service.loadConfig = function () {
 		return $http.get("/workspace/loadConfig");
-	}
-
+	};
+    service.build = function (cfg) {
+        return $http.post("/workspace/build", angular.toJson(cfg));
+    };
 	return service;
   });

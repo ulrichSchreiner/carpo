@@ -8,17 +8,15 @@
     <div class="control-group">
 	<label class="control-label" for="gotool">Standard Go Tool</label>
     <div class="controls">
-      <input type="text" id="gotool" placeholder="Path to 'go' tool" ng-model="data.gotool">
+      <input type="text" id="gotool" placeholder="Path to 'go' tool" ng-model="data.go">
     </div>
 	<label class="control-label" for="goapptool">Appengine Go Tool</label>
     <div class="controls">
-      <input type="text" id="goapptool" placeholder="Path to 'goapp' tool" ng-model="data.goapptool">
+      <input type="text" id="goapptool" placeholder="Path to 'goapp' tool" ng-model="data.goapp">
     </div>
     <label class="control-label" for="goselector">Build type</label>
     <div class="controls">
-        <select ng-model="data.apptype" ng-options="n as l for (n,l) in apptypes">
-            <option value="">-- search path for go --</option>
-        </select>
+        <select required ng-model="data.apptype" ng-options="n as l for (n,l) in apptypes"></select>
     </div>
   </div>
   </form>

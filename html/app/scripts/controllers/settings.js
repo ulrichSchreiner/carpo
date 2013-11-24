@@ -18,12 +18,12 @@ angular.module('htmlApp')
   })
   .controller('ToolsSettingsCtrl', function ($scope,$modalInstance,config) {
     $scope.apptypes = {
-        gotool:"Standard Go",
-        goapptool:"Appengine"
+        go:"Standard Go",
+        goapp:"Appengine"
     };
 	$scope.data = {
-        gotool:config.gotool,
-        goapptool:config.goapptool,
+        go:config.go,
+        goapp:config.goapp,
         apptype:config.apptype
 	};
 

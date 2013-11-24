@@ -160,7 +160,7 @@ angular.module('htmlApp')
         if (builder != null) {
             builder = $scope.config[builder];
         }
-		var doc = {path:f.path, content:f.session.getValue(), mode:f.mode, build:true, builder:builder};
+		var doc = {path:f.path, content:f.session.getValue(), mode:f.mode, build:true, builder:builder, buildtype:$scope.config.apptype};
 		Workspaceservice.save(doc, function(d) {
 			if (d.data.ok) {
 				f.dirty = false;
@@ -243,8 +243,8 @@ angular.module('htmlApp')
 	    });
 
       	modalInstance.result.then(function (item) {
-			$scope.config.gotool = item.gotool;
-			$scope.config.goapptool = item.goapptool;
+			$scope.config.go = item.go;
+			$scope.config.goapp = item.goapp;
             $scope.config.apptype = item.apptype;
       	});
     };
@@ -340,8 +340,6 @@ angular.module('htmlApp')
     $scope.pushOutput = function (fl, data) {
         var output = data.buildoutput;
         var np = [];
-        // first filter out all problems from "fl"
-        var dirname = $scope.dirname(fl.path);
         var packs = {};
         // index the output by the directory
         angular.forEach (data.builtDirectories, function (e) {
@@ -374,10 +372,21 @@ angular.module('htmlApp')
       return parts.slice(0,-1).join("/");
     };
 	Workspaceservice.loadConfig().then (function (d) {
-            if (d.data !== null && d.data.basedirectory !== null  ) {              
-                $scope.config = d.data;
-                $scope.setRoot($scope.config.basedirectory);
+        if (d.data.basedirectory === undefined) {
+            d.data.basedirectory="";
+        }
+        $scope.config = d.data;
+        $scope.setRoot($scope.config.basedirectory);
+        var build = {build:true, buildtype:$scope.config.apptype, builder:$scope.config[$scope.config.apptype]};
+        Workspaceservice.build (build).then (function (bres) {
+            if (bres.data.ok) {
+                $scope.pushOutput($scope.currentfile, bres.data);
+                if ($scope.currentfile !== null)
+                    $scope.showAnnotations($scope.currentfile, $scope.problems.errors);
+            } else {
+                $scope.addAlert(bres.data.message);
             }
+        });
 		//$scope.chabs(0);
 	});
 

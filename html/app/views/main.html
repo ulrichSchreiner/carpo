@@ -58,7 +58,7 @@
       </thead>
       <tbody>
           <tr ng-repeat="e in problems.errors" ng-click="jumpTo(e)">
-              <td>{{e.source}}</td>
+              <td>{{e.file}}</td>
               <td>{{e.line}}</td>
               <td>{{e.message}}</td>
           </tr>
