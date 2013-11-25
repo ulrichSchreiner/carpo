@@ -115,11 +115,15 @@ func Scan(gopath []string) *GoWorkspace {
 	g.context = build.Default
 	g.context.GOPATH = strings.Join(gopath, string(filepath.ListSeparator))
 	g.GoPath = gopath
-	for _, src := range gopath {
+	for i, src := range gopath {
 		srcd := new(srcDir)
 		srcd.ws = g
 		srcd.path = filepath.Join(src, "src")
 		filepath.Walk(src, srcd.walker)
+		if i == 0 {
+			// first element in gopath is special
+			g.Path = src
+		}
 	}
 	g.resolve()
 	return g
@@ -141,11 +145,11 @@ func (ws *GoWorkspace) BuildPackage(base string, gotool string, packdir string) 
 			dirs = append(dirs, ws.findDirectoryFromPackage(d))
 		}
 	}
-	res, err := ws.build(gotool, packdir, args...)
+	res, err := ws.build(gotool, ws.Path, args...)
 	if err != nil {
 		return nil, nil, err
 	}
-	parsed := parseBuildOutput(base, packdir, res)
+	parsed := parseBuildOutput(base, res)
 	return &parsed, &dirs, nil
 }
 
@@ -160,7 +164,7 @@ func (ws *GoWorkspace) FullBuild(base string, gotool string) (*[]BuildResult, *[
 	if err != nil {
 		return nil, nil, err
 	}
-	parsed := parseBuildOutput(base, "/", res)
+	parsed := parseBuildOutput(base, res)
 	return &parsed, &dirs, nil
 }
 
@@ -179,7 +183,7 @@ func (ws *GoWorkspace) build(gobin string, dir string, args ...string) (string, 
 	return string(res), nil
 }
 
-func parseBuildOutput(base string, packdir string, output string) []BuildResult {
+func parseBuildOutput(base string, output string) []BuildResult {
 	var res []BuildResult
 	lines := strings.Split(output, "\n")
 	for _, l := range lines {
@@ -189,13 +193,16 @@ func parseBuildOutput(base string, packdir string, output string) []BuildResult 
 			var br BuildResult
 			br.Original = l
 			br.Source = string(m[1])
-			rel, err := filepath.Rel(base, filepath.Join(packdir, br.Source))
-			if err != nil {
-				log.Printf("source is not in workspace: %s", err)
-				br.File = filepath.Join(packdir, br.Source)
-			} else {
-				br.File = "/" + rel
-			}
+			br.File = "/" + br.Source
+			/*
+				rel, err := filepath.Rel(base, filepath.Join(packdir, br.Source))
+				if err != nil {
+					log.Printf("source is not in workspace: %s", err)
+					br.File = filepath.Join(packdir, br.Source)
+				} else {
+					br.File = "/" + rel
+				}
+			*/
 			br.Directory = filepath.Dir(br.File)
 			br.Message = string(m[len(m)-1])
 			sourceline := strings.Split(string(m[2]), ":")[0]
@@ -206,6 +213,13 @@ func parseBuildOutput(base string, packdir string, output string) []BuildResult 
 				br.Line = int(ln)
 			}
 			res = append(res, br)
+		} else {
+			if len(res) > 0 {
+				l = strings.TrimSpace(l)
+				last := &res[len(res)-1]
+				last.Original = last.Original + " " + l
+				last.Message = last.Message + " " + l
+			}
 		}
 	}
 	// now parse output

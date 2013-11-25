@@ -298,7 +298,14 @@ angular.module('htmlApp')
 			exec: function(editor) {
 				$scope.saveFile($scope.currentfile);
 			}
-        })
+        });
+    	_editor.commands.addCommand({
+			name: "fullBuild",
+			bindKey: {win: "Ctrl-B", mac: "Command-B"},
+			exec: function(editor) {
+				$scope.build();
+			}
+        });
 	};
 
     $scope.aceChanged = function(e) {
@@ -371,12 +378,7 @@ angular.module('htmlApp')
       var parts = pt.split("/");
       return parts.slice(0,-1).join("/");
     };
-	Workspaceservice.loadConfig().then (function (d) {
-        if (d.data.basedirectory === undefined) {
-            d.data.basedirectory="";
-        }
-        $scope.config = d.data;
-        $scope.setRoot($scope.config.basedirectory);
+    $scope.build = function () {
         var build = {build:true, buildtype:$scope.config.apptype, builder:$scope.config[$scope.config.apptype]};
         Workspaceservice.build (build).then (function (bres) {
             if (bres.data.ok) {
@@ -386,7 +388,26 @@ angular.module('htmlApp')
             } else {
                 $scope.addAlert(bres.data.message);
             }
-        });
+        });        
+    };
+	Workspaceservice.loadConfig().then (function (d) {
+        if (d.data.basedirectory === undefined) {
+            d.data.basedirectory="";
+        }
+        $scope.config = d.data;
+        $scope.setRoot($scope.config.basedirectory);
+        $scope.build ();
+        /*
+        var build = {build:true, buildtype:$scope.config.apptype, builder:$scope.config[$scope.config.apptype]};
+        Workspaceservice.build (build).then (function (bres) {
+            if (bres.data.ok) {
+                $scope.pushOutput($scope.currentfile, bres.data);
+                if ($scope.currentfile !== null)
+                    $scope.showAnnotations($scope.currentfile, $scope.problems.errors);
+            } else {
+                $scope.addAlert(bres.data.message);
+            }
+        });*/
 		//$scope.chabs(0);
 	});
 
