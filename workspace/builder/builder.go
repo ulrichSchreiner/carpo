@@ -15,6 +15,7 @@ import (
 
 const (
 	BUILD_COMMAND = "install"
+	TEST_COMMAND  = "test"
 )
 
 var (
@@ -130,7 +131,7 @@ func Scan(gopath []string) *GoWorkspace {
 }
 
 func (ws *GoWorkspace) BuildPackage(base string, gotool string, packdir string) (*[]BuildResult, *[]string, error) {
-	args := []string{BUILD_COMMAND}
+	args := []string{}
 	dirs := []string{}
 	pack, err := ws.findPackageFromDirectory(packdir)
 	if err != nil {
@@ -154,7 +155,7 @@ func (ws *GoWorkspace) BuildPackage(base string, gotool string, packdir string) 
 }
 
 func (ws *GoWorkspace) FullBuild(base string, gotool string) (*[]BuildResult, *[]string, error) {
-	args := []string{BUILD_COMMAND}
+	args := []string{}
 	dirs := []string{}
 	for p, _ := range ws.Packages {
 		args = append(args, p)
@@ -168,8 +169,10 @@ func (ws *GoWorkspace) FullBuild(base string, gotool string) (*[]BuildResult, *[
 	return &parsed, &dirs, nil
 }
 
-func (ws *GoWorkspace) build(gobin string, dir string, args ...string) (string, error) {
-	cmd := exec.Command(gobin, args...)
+func (ws *GoWorkspace) gocmd(gobin string, command string, dir string, args ...string) (string, error) {
+	arguments := []string{command}
+	arguments = append(arguments, args...)
+	cmd := exec.Command(gobin, arguments...)
 	cmd.Dir = dir
 	cmd.Env = []string{fmt.Sprintf("GOPATH=%s", ws.context.GOPATH)}
 	res, err := cmd.CombinedOutput()
@@ -181,6 +184,10 @@ func (ws *GoWorkspace) build(gobin string, dir string, args ...string) (string, 
 		}
 	}
 	return string(res), nil
+}
+
+func (ws *GoWorkspace) build(gobin string, dir string, args ...string) (string, error) {
+	return ws.gocmd(gobin, BUILD_COMMAND, dir, args...)
 }
 
 func parseBuildOutput(base string, output string) []BuildResult {
