@@ -194,15 +194,7 @@ func parseBuildOutput(base string, output string) []BuildResult {
 			br.Original = l
 			br.Source = string(m[1])
 			br.File = "/" + br.Source
-			/*
-				rel, err := filepath.Rel(base, filepath.Join(packdir, br.Source))
-				if err != nil {
-					log.Printf("source is not in workspace: %s", err)
-					br.File = filepath.Join(packdir, br.Source)
-				} else {
-					br.File = "/" + rel
-				}
-			*/
+
 			br.Directory = filepath.Dir(br.File)
 			br.Message = string(m[len(m)-1])
 			sourceline := strings.Split(string(m[2]), ":")[0]
