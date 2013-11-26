@@ -183,6 +183,16 @@ func (ws *GoWorkspace) BuildPackage(base string, gotool string, packdir string) 
 	if err != nil {
 		return nil, nil, err
 	}
+	// now for the tests ...
+	deps, ok = ws.testneededBy[pack]
+	args = []string{pack}
+	if ok {
+		args = append(args, deps...)
+		for _, d := range deps {
+			dirs = append(dirs, ws.findDirectoryFromPackage(d))
+		}
+	}
+	res = res + "\n" + ws.buildtests(gotool, args...)
 	parsed := parseBuildOutput(base, res)
 	return &parsed, &dirs, nil
 }
@@ -222,18 +232,23 @@ func (ws *GoWorkspace) gocmd(gobin string, command string, dir string, args ...s
 func (ws *GoWorkspace) build(gobin string, args ...string) (string, error) {
 	res, err := ws.gocmd(gobin, BUILD_COMMAND, ws.Workdir, args...)
 	if err == nil {
-		for _, p := range args {
-			if ws.packageHasTests(p) {
-				testres, testerr := ws.gocmd(gobin, TEST_COMMAND, ws.Workdir, "-c", p)
-				if testerr == nil && !strings.HasPrefix(testres, "?") {
-					res = res + "\n" + testres
-				}
-			}
-		}
+		//res = res + "\n" + ws.buildtests(gobin, args...)
 	}
 	return res, err
 }
 
+func (ws *GoWorkspace) buildtests(gobin string, args ...string) string {
+	res := ""
+	for _, p := range args {
+		if ws.packageHasTests(p) {
+			testres, testerr := ws.gocmd(gobin, TEST_COMMAND, ws.Workdir, "-c", p)
+			if testerr == nil && !strings.HasPrefix(testres, "?") {
+				res = res + "\n" + testres
+			}
+		}
+	}
+	return res
+}
 func parseBuildOutput(base string, output string) []BuildResult {
 	var res []BuildResult
 	lines := strings.Split(output, "\n")
