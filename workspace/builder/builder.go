@@ -16,6 +16,7 @@ import (
 const (
 	BUILD_COMMAND = "install"
 	TEST_COMMAND  = "test"
+	WORKDIR       = ".carpowork"
 )
 
 var (
@@ -37,11 +38,14 @@ type GoWorkspace struct {
 	Packages map[string]*build.Package
 	Build    []BuildResult
 	Path     string
+	Workdir  string
 	GoPath   []string
 	// some private data
-	context      build.Context
-	neededBy     map[string][]string
-	dependencies map[string][]string
+	context          build.Context
+	neededBy         map[string][]string
+	dependencies     map[string][]string
+	testneededBy     map[string][]string
+	testdependencies map[string][]string
 }
 
 func (ws *GoWorkspace) findPackageFromDirectory(dir string) (string, error) {
@@ -61,19 +65,49 @@ func (ws *GoWorkspace) findDirectoryFromPackage(p string) string {
 func (ws *GoWorkspace) addDependency(p *build.Package, needs []string) {
 	ws.dependencies[p.ImportPath] = needs
 }
+func (ws *GoWorkspace) addTestDependency(p *build.Package, needs []string) {
+	ws.testdependencies[p.ImportPath] = needs
+}
 
-func (ws *GoWorkspace) resolve() {
-	for p, pkgs := range ws.dependencies {
+func (ws *GoWorkspace) resolveDeps(deps *map[string][]string, needs *map[string][]string) {
+	for p, pkgs := range *deps {
 		for _, pack := range pkgs {
-			packs, ok := ws.neededBy[pack]
+			packs, ok := (*needs)[pack]
 			if !ok {
 				packs = []string{p}
 			} else {
 				packs = append(packs, p)
 			}
-			ws.neededBy[pack] = packs
+			(*needs)[pack] = packs
 		}
 	}
+}
+
+func (ws *GoWorkspace) packageHasTests(packname string) bool {
+	p, ok := ws.Packages[packname]
+	if ok {
+		return len(p.TestGoFiles) > 0
+	}
+	return false
+}
+
+func (ws *GoWorkspace) resolve() {
+	ws.resolveDeps(&ws.dependencies, &ws.neededBy)
+	ws.resolveDeps(&ws.testdependencies, &ws.testneededBy)
+}
+
+func (ws *GoWorkspace) importPackage(packname string, path string) error {
+	pack, err := ws.context.Import(packname, path, 0)
+	if err != nil {
+		return err
+	} else {
+		if bytes.Compare([]byte(pack.Name), []byte("main")) != 0 {
+			ws.Packages[packname] = pack
+			ws.addDependency(pack, pack.Imports)
+			ws.addTestDependency(pack, pack.TestImports)
+		}
+	}
+	return nil
 }
 
 type srcDir struct {
@@ -91,18 +125,7 @@ func (src *srcDir) walker(path string, info os.FileInfo, err error) error {
 				// well if this happens, something terrible happend ...
 			} else {
 				packname := filepath.Dir(rel)
-				pack, ok := src.ws.Packages[packname]
-				if !ok {
-					pack, err = src.ws.context.Import(filepath.Dir(rel), path, 0)
-					if err != nil {
-						log.Printf("import error: %s, %+v\n", err, pack)
-					} else {
-						if bytes.Compare([]byte(pack.Name), []byte("main")) != 0 {
-							src.ws.Packages[packname] = pack
-							src.ws.addDependency(pack, pack.Imports)
-						}
-					}
-				}
+				src.ws.importPackage(packname, path)
 			}
 		}
 	}
@@ -113,6 +136,8 @@ func Scan(gopath []string) *GoWorkspace {
 	g.Packages = make(map[string]*build.Package)
 	g.neededBy = make(map[string][]string)
 	g.dependencies = make(map[string][]string)
+	g.testneededBy = make(map[string][]string)
+	g.testdependencies = make(map[string][]string)
 	g.context = build.Default
 	g.context.GOPATH = strings.Join(gopath, string(filepath.ListSeparator))
 	g.GoPath = gopath
@@ -124,6 +149,9 @@ func Scan(gopath []string) *GoWorkspace {
 		if i == 0 {
 			// first element in gopath is special
 			g.Path = src
+			g.Workdir = filepath.Join(g.Path, WORKDIR)
+			// ignore error if directory exists
+			os.Mkdir(g.Workdir, 0755)
 		}
 	}
 	g.resolve()
@@ -133,7 +161,12 @@ func Scan(gopath []string) *GoWorkspace {
 func (ws *GoWorkspace) BuildPackage(base string, gotool string, packdir string) (*[]BuildResult, *[]string, error) {
 	args := []string{}
 	dirs := []string{}
+	log.Printf("save: %s, %s", base, packdir)
 	pack, err := ws.findPackageFromDirectory(packdir)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = ws.importPackage(pack, packdir)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -146,7 +179,7 @@ func (ws *GoWorkspace) BuildPackage(base string, gotool string, packdir string) 
 			dirs = append(dirs, ws.findDirectoryFromPackage(d))
 		}
 	}
-	res, err := ws.build(gotool, ws.Path, args...)
+	res, err := ws.build(gotool, args...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -161,7 +194,7 @@ func (ws *GoWorkspace) FullBuild(base string, gotool string) (*[]BuildResult, *[
 		args = append(args, p)
 		dirs = append(dirs, ws.findDirectoryFromPackage(p))
 	}
-	res, err := ws.build(gotool, ws.Path, args...)
+	res, err := ws.build(gotool, args...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -186,8 +219,19 @@ func (ws *GoWorkspace) gocmd(gobin string, command string, dir string, args ...s
 	return string(res), nil
 }
 
-func (ws *GoWorkspace) build(gobin string, dir string, args ...string) (string, error) {
-	return ws.gocmd(gobin, BUILD_COMMAND, dir, args...)
+func (ws *GoWorkspace) build(gobin string, args ...string) (string, error) {
+	res, err := ws.gocmd(gobin, BUILD_COMMAND, ws.Workdir, args...)
+	if err == nil {
+		for _, p := range args {
+			if ws.packageHasTests(p) {
+				testres, testerr := ws.gocmd(gobin, TEST_COMMAND, ws.Workdir, "-c", p)
+				if testerr == nil && !strings.HasPrefix(testres, "?") {
+					res = res + "\n" + testres
+				}
+			}
+		}
+	}
+	return res, err
 }
 
 func parseBuildOutput(base string, output string) []BuildResult {
@@ -200,8 +244,8 @@ func parseBuildOutput(base string, output string) []BuildResult {
 			var br BuildResult
 			br.Original = l
 			br.Source = string(m[1])
-			br.File = "/" + br.Source
-
+			// we always work in a subdirectory named ".carpowork", so strip the ".." from the filepath
+			br.File = br.Source[2:]
 			br.Directory = filepath.Dir(br.File)
 			br.Message = string(m[len(m)-1])
 			sourceline := strings.Split(string(m[2]), ":")[0]
