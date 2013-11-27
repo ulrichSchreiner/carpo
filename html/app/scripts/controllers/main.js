@@ -283,7 +283,11 @@ angular.module('htmlApp')
 	};
 	$scope.setRoot = function(rt) {
 		$scope.data.root = rt;
-		$scope.data.rootpathentries = $scope.data.root.slice(1).split("/");
+        if (rt.trim().length == 0) {
+            $scope.data.rootpathentries = []
+        } else {
+		    $scope.data.rootpathentries = $scope.data.root.slice(1).split("/");
+        }
 		$scope.data.cwd = "/";
 		$scope.selectFileElement("/",true);
 		$scope.config.basedirectory = $scope.data.root;
