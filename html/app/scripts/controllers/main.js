@@ -133,6 +133,15 @@ angular.module('htmlApp')
         $scope.showAnnotations(f, $scope.problems.errors);
 	};
 
+    $scope.closeAll = function () {
+        angular.forEach ($scope.openfiles, function (f) {
+           f.session.setValue("");
+           f.session = null;
+        });
+        $scope.openfiles = [];
+        $scope.currentfile = null;
+    };
+    
 	$scope.closeFile = function (f) {
 		var newItems = [];
 		for (var i=0; i<$scope.openfiles.length; i++) {

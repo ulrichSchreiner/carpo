@@ -5,6 +5,7 @@ angular.module('htmlApp', [
   'ngResource',
   'ngSanitize',
   'ui.ace',
+  'ui.keypress',
   'ui.bootstrap',
   'snap'
 ])

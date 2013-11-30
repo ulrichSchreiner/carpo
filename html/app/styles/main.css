@@ -3,6 +3,7 @@ body {
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     color: #333;
 }
+
 #content {
 	height: 100%;
 	width: 100%;
@@ -11,6 +12,9 @@ body {
 
 .pathEntry {
 	cursor:pointer;
+}
+.menuEntry {
+    cursor:pointer;
 }
 
 #dirEntriesToolbar {
@@ -35,7 +39,7 @@ body {
 
 #editor {
 	position: absolute;
-	top: 45px;
+	top: 90px;
 	left:210px;
 	right: 0px;
 	bottom: 146px;

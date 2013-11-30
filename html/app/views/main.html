@@ -1,7 +1,32 @@
-<div id="content" snap-content snap-options="snapOpts">
+<div id="content" snap-content snap-options="snapOpts" 
+    ui-keypress="{'ctrl-2':'build()'}" tabindex="0">
 <div >
+<div class="navbar navbar-static-top">
+  <div class="navbar-inner">
+    <a class="brand" ><i snap-toggle="left" class="icon-align-justify menuEntry"></i></a>
+    <ul class="nav nav-tabs">
+      <li class="dropdown">
+        <a class="dropdown-toggle" data-toggle="dropdown" href="#">
+            GoLang
+            <span class="caret"></span>
+        </a>
+        <ul class="dropdown-menu">
+            <li><a ng-click="build()" class="menuEntry">Build (Ctrl-b)</a></li>
+        </ul>
+      </li>
+      <li class="dropdown">
+        <a class="dropdown-toggle" data-toggle="dropdown" href="#">
+            Editor
+            <span class="caret"></span>
+        </a>
+        <ul class="dropdown-menu">
+            <li><a ng-click="closeAll()" class="menuEntry">Close all</a></li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+</div>
 	<ul class="breadcrumb">
-		<li><i snap-toggle="left" class="icon-align-justify"></i><span class="divider"></span></li>
 	  <li>
 			<div class="btn-group">
 			  <a class="btn" ng-click="chabs($index)"><i class="icon-folder-open"></i> {{data.root+"/"}}</a>
@@ -73,7 +98,7 @@
 <div snap-drawer="left">
 <ul class="nav nav-list">
   <li class="nav-header">Settings</li>
-  <li><a ng-click="editorSettings()">Editor</a></li>
-  <li><a ng-click="toolsSettings()">Tools</a></li>
+  <li><a class="menuEntry" ng-click="editorSettings()">Editor</a></li>
+  <li><a class="menuEntry" ng-click="toolsSettings()">Tools</a></li>
 </ul>
 </div>

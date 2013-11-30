@@ -161,14 +161,14 @@ func Scan(gopath []string) *GoWorkspace {
 func (ws *GoWorkspace) BuildPackage(base string, gotool string, packdir string) (*[]BuildResult, *[]string, error) {
 	args := []string{}
 	dirs := []string{}
-	log.Printf("save: %s, %s", base, packdir)
 	pack, err := ws.findPackageFromDirectory(packdir)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("findPacakgeFromDirectory: %s", err)
 	}
 	err = ws.importPackage(pack, packdir)
 	if err != nil {
-		return nil, nil, err
+		// let's ignore this error, it will raise again when building...
+		//return nil, nil, fmt.Errorf("importPackage: %s", err)
 	}
 	args = append(args, pack)
 	dirs = append(dirs, ws.findDirectoryFromPackage(pack))
