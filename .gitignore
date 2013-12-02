@@ -5,4 +5,5 @@ html/.sass-cache
 html/app/bower_components
 cmd/dist
 qx/carpo/source/script
+qx/carpo/source/qooxdoo
 qx/carpo/build

@@ -1,5 +1,7 @@
 #!/bin/sh
 
-export QOOXDOO_PATH=`pwd`/../qooxdoo
+# we need a symlink to the unzipped (or git-repo) of qooxdoo in the source directory!
+
+export QOOXDOO_PATH=`pwd`/source/qooxdoo
 ./generate.py $*
 
