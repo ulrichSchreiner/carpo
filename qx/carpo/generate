@@ -1,0 +1,5 @@
+#!/bin/sh
+
+export QOOXDOO_PATH=`pwd`/../qooxdoo
+./generate.py $*
+

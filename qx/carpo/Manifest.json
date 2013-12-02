@@ -1,0 +1,34 @@
+{
+  "info" : 
+  {
+    "name" : "carpo",
+
+    "summary" : "Carpo Application",
+    "description" : "A simple GO IDE.",
+    
+    "homepage" : "http://github.com/ulrichSchreiner/carpo/",
+
+    "license" : "",
+    "authors" : 
+    [
+      {
+        "name" : "Ulrich Schreiner",
+        "email" : "ulrich.schreiner@gmail.com"
+      }
+    ],
+
+    "version" : "trunk",
+    "qooxdoo-versions": ["3.0.1"]
+  },
+  
+  "provides" : 
+  {
+    "namespace"   : "carpo",
+    "encoding"    : "utf-8",
+    "class"       : "source/class",
+    "resource"    : "source/resource",
+    "translation" : "source/translation",
+    "type"        : "application"
+  }
+}
+
