@@ -1,0 +1,21 @@
+{
+  "name": "carpo",
+  "version": "0.0.0",
+  "homepage": "https://github.com/ulrichSchreiner/carpo",
+  "description": "carpo",
+  "authors": [
+    "Ulrich Schreiner"
+  ],
+  "license": "MIT",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "ace-builds": "~1.1.1"
+  }
+}

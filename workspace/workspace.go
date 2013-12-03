@@ -38,9 +38,9 @@ func (w *workspace) Register(container *restful.Container) {
 	ws.Route(ws.GET("/touch").To(w.touch).Writes(Dir{}))
 	ws.Route(ws.GET("/rm").To(w.rmfile).Writes(Dir{}))
 	ws.Route(ws.GET("/file").To(w.file).Writes(FileContent{}))
-	ws.Route(ws.POST("/save").To(w.save).Reads(FileSaveRequest{}).Writes(FileSaveResponse{}))
-	ws.Route(ws.POST("/saveConfig").To(w.saveConfig))
-	ws.Route(ws.GET("/loadConfig").To(w.loadConfig))
+	ws.Route(ws.POST("/file").To(w.save).Reads(FileSaveRequest{}).Writes(FileSaveResponse{}))
+	ws.Route(ws.POST("/config").To(w.saveConfig))
+	ws.Route(ws.GET("/config").To(w.loadConfig))
 	ws.Route(ws.POST("/build").To(w.buildWorkspace).Reads(BuildRequest{}).Writes(BuildResponse{}))
 	container.Add(&ws)
 }

@@ -45,7 +45,12 @@ qx.Class.define("carpo.Application",
         // support additional cross-browser console. Press F7 to toggle visibility
         qx.log.appender.Console;
       }
+      this.workspace = new carpo.Workspace();
+      carpo.EditorsPane.loadAce(qx.lang.Function.bind(this.init, this));
+    },
 
+    init : function () {
+      var app = this;
       var container = new qx.ui.container.Composite(new qx.ui.layout.VBox(2)).set({
         decorator: "main",
         allowGrowY: true,
@@ -59,10 +64,11 @@ qx.Class.define("carpo.Application",
         allowGrowY: true,
         allowGrowX: true
       });
-      var l1 = new qx.ui.basic.Label("Lorem ipsum dolor sit amet");
-      l1.setRich(true);
-      l1.setDecorator("main");
-      l1.setAllowGrowX(true);
+      var editors = new carpo.EditorsPane();
+      editors.setDecorator("main");
+      editors.setAllowGrowX(true);
+      editors.setAllowGrowY(true);
+      
       var l2 = new qx.ui.basic.Label("Lorem ipsum dolor sit amet");
       l2.setRich(true);
       l2.setDecorator("main");
@@ -72,15 +78,99 @@ qx.Class.define("carpo.Application",
       tree.setAlwaysShowOpenCloseSymbol(true);
       tree.setDecorator("main");
       tree.setAllowGrowX(true);
+      tree.setStatusBarVisible(false);
+
+      var dm = tree.getDataModel();
+      tree.addListener("cellClick", function(ce) {
+         var node = dm.getNode(ce.getRow());
+         if (node.type == qx.ui.treevirtual.MTreePrimitive.Type.LEAF) {
+             var pt = this.filepathFromNode(tree, node);
+             this.workspace.loadFile (pt, function (data) {
+                editors.openEditor(pt, node.label, data.content);                 
+             });
+         } else {
+             dm.setState(node, {bOpened:!node.bOpened});
+         }
+      }, this);
+      tree.addListener("treeOpenWithContent", function(e) {
+         var node = e.getData();
+         var pt = this.filepathFromNode(tree, node);
+         this.buildTreeNodes(dm, node.nodeId, pt);
+      }, this);
+      tree.addListener("treeOpenWhileEmpty", function(e) {
+         var node = e.getData();
+         var pt = this.filepathFromNode(tree, node);
+         this.buildTreeNodes(dm, node.nodeId, pt);         
+         //this.buildTreeNodes(dm, node.nodeId, "/"+node.label);
+      }, this);
       
-      pane.add(tree);
-      pane.add(l2);
+      pane.add(tree,1);
+      pane.add(editors,4);
       container.add(pane, {flex:1});
       this.getRoot().add(container, {width:"100%", height:"100%"});
-      
-      var ws = new carpo.Workspace();
-      ws.dir("/src");
+
+      this.buildTreeNodes (dm, null, "/");
+      /*
+      this.workspace.dir("/", function (data) {
+          data.entries.sort(function(a,b) {
+              return a.name.localeCompare(b.name);
+          }).forEach(function (el, idx) {
+            if (el.dir) {
+                dm.addBranch(null,el.name, false);
+            } else {
+                dm.addLeaf(null, el.name);
+            }
+          });
+          dm.setData();
+      });*/
+      this._configuration = {};
+      this.refreshConfig(function (config) {
+        var filter = qx.lang.Function.bind(function(node) {
+            var label = node.label;
+            if (config.hidefiles && config.hidefiles!=="") {
+                return new RegExp(config.hidefiles).exec(label) === null;
+            }
+            return true;
+        }, this);
+        dm.setFilter(filter);
+      });
     },
+    filepathFromNode : function (tree, node) {
+        var h = tree.getHierarchy(node.nodeId);
+        var pt = h.reduce(function (prev,cur) {
+            return prev+cur+"/";
+        },"/");
+        return pt;
+    },
+    
+    buildTreeNodes : function (treemodel, parnode, path) {
+        this.workspace.dir(path, function (data) {
+          if (parnode) {
+              treemodel.prune(parnode, false);
+          }
+          data.entries.sort(function(a,b) {
+              return a.name.localeCompare(b.name);
+          }).forEach(function (el, idx) {
+            if (el.dir) {
+                treemodel.addBranch(parnode,el.name, false);
+            } else {
+                treemodel.addLeaf(parnode, el.name);
+            }
+          });
+          treemodel.setData();
+      });     
+    },
+    refreshConfig : function (cb) {
+        this.workspace.loadconfig (function (data) {
+            // config data is a pure string ...
+            this._configuration = qx.lang.Json.parse(data);
+            cb(this._configuration);
+        });
+    },
+    getConfig : function ()  {
+        return this._configuration;
+    },
+    
     getMenuBar : function() {
       var frame = new qx.ui.container.Composite(new qx.ui.layout.Grow());
 
