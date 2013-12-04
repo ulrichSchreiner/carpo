@@ -69,18 +69,19 @@ qx.Class.define("carpo.EditorsPane",
     },
 
 
-    construct : function()
+    construct : function(config)
     {
       this.base(arguments);
       this._openeditors = {};
       this.setContentPadding(0,0,0,0);
+      this._config = config;
     },
     members: {
         openEditor : function (path, title, content, filemode) {
-            if (this._openeditors[path] != null) {
+            if (this._openeditors[path]) {
                 this.setSelection(new Array(this._openeditors[path]));
             } else {
-                var page = new carpo.Editor(path, title, content, filemode);
+                var page = new carpo.Editor(path, title, content, filemode, this._config);
                 page.addListener ("close", function (evt) {
                     this.editorClosed (evt.getTarget());
                 }, this);
@@ -96,6 +97,14 @@ qx.Class.define("carpo.EditorsPane",
         
         getCurrentEditor : function () {
             return this.getSelection()[0];
+        },
+        
+        configChanged : function (config) {
+            this._config = config;
+            for (var ek in this._openeditors) {
+                var ed = this._openeditors[ek];
+                ed.configChanged (config);
+            }
         }
     }
 });

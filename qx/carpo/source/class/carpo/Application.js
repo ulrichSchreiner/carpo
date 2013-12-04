@@ -89,7 +89,7 @@ qx.Class.define("carpo.Application",
       resizeBehavior.setWidth(1, "10%");
       resizeBehavior.setWidth(2, "70%");
       
-      this.editors = new carpo.EditorsPane();
+      this.editors = new carpo.EditorsPane(null);
       
       this.editors.setDecorator("main");
       this.editors.setAllowGrowX(true);
@@ -288,6 +288,10 @@ qx.Class.define("carpo.Application",
         s.setModal(true);
         s.moveTo(100,100);
         s.open();
+        s.addListener("ok", function (e) {
+            console.log("settings: ",e.getData());
+            this.editors.configChanged(e.getData());
+        }, this);
         this.getRoot().add(s);
     },
     
