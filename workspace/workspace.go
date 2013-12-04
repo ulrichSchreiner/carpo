@@ -368,8 +368,8 @@ func NewWorkspace(path string) error {
 	} else {
 		w.goapptool = &goapppath
 	}
-	log.Printf("go: %s", *w.gotool)
-	log.Printf("goapp: %s", *w.goapptool)
+	//log.Printf("go: %s", *w.gotool)
+	//log.Printf("goapp: %s", *w.goapptool)
 
 	wsContainer := restful.NewContainer()
 	w.Register(wsContainer)
