@@ -48,6 +48,7 @@ qx.Class.define("carpo.Editor",
             this.__ace.getSession().setValue(val);
         },
         configChanged : function (config) {
+            this.setConfig(config);
             var container = this.__editor.getContentElement().getDomElement();
             container.style.font = this._fontFromConfig();
         },
