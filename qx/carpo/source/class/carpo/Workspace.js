@@ -28,6 +28,11 @@ qx.Class.define("carpo.Workspace",
       loadFile : function (pt, cb) {
           var d  =this.__getresource("get","GET","/workspace/file", cb);
           d.get({},"path="+pt);
+      },
+      
+      saveFile : function (pt, data, cb) {
+          var d  =this.__getresource("post","POST","/workspace/file", cb);
+          d.post({}, data);
       }
   }
 });

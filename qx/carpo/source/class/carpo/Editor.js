@@ -4,14 +4,16 @@ qx.Class.define("carpo.Editor",
     properties : {
         filepath: { init: null },
         filename: { init: null },
-        content: { init: null }
+        content: { init: null },
+        mode: { init: null }
     },
-    construct : function(filepath, filename, content) {
+    construct : function(filepath, filename, content, mode) {
         this.base(arguments, filename);
         this.setLayout(new qx.ui.layout.VBox(0));
         this.setFilepath(filepath);
         this.setFilename(filename);
         this.setContent(content);
+        this.setMode(mode);
         this.setShowCloseButton(true);
         this.__editor = new qx.ui.core.Widget();
         this.__editor.addListenerOnce("appear", function() {
@@ -22,6 +24,19 @@ qx.Class.define("carpo.Editor",
     },
     
     members: {
+        getEditorValue : function () {
+            return this.__ace.getSession().getValue();  
+        },
+        getEditorData : function () {
+            return {
+                content:this.getEditorValue(),
+                path:this.getFilepath(),
+                mode:this.getMode()
+            };
+        },
+        setEditorValue : function (val) {
+            this.__ace.getSession().setValue(val);
+        },
         __onEditorAppear : function () {
             qx.event.Timer.once(function() {
                 var container = this.__editor.getContentElement().getDomElement();
@@ -50,7 +65,7 @@ qx.Class.define("carpo.Editor",
                     self.__ace.resize();
                   }, 0);
                 });
-            }, this, 500);            
+            }, this, 100);            
         }
     }
 });

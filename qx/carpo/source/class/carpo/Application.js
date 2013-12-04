@@ -51,6 +51,7 @@ qx.Class.define("carpo.Application",
 
     init : function () {
       var app = this;
+      this.createCommands ();
       var container = new qx.ui.container.Composite(new qx.ui.layout.VBox(2)).set({
         decorator: "main",
         allowGrowY: true,
@@ -59,20 +60,41 @@ qx.Class.define("carpo.Application",
       container.add(this.getMenuBar(),{flex:0});
       
       var pane = new qx.ui.splitpane.Pane("horizontal").set({
-        //width : 450,
-        //height : 300
         allowGrowY: true,
         allowGrowX: true
       });
-      var editors = new carpo.EditorsPane();
-      editors.setDecorator("main");
-      editors.setAllowGrowX(true);
-      editors.setAllowGrowY(true);
+      var pane2 = new qx.ui.splitpane.Pane("vertical").set({
+        allowGrowY: true,
+        allowGrowX: true
+      });
+      this.compileroutputModel = new qx.ui.table.model.Simple();
+      this.compileroutputModel.setColumns([ "Source", "Line", "Message" ]);
+      var custom = {
+        tableColumnModel : function(obj) {
+          return new qx.ui.table.columnmodel.Resize(obj);
+        }
+      };      
+      this.compileroutput = new qx.ui.table.Table(this.compileroutputModel, custom)
+        .set({
+            allowGrowX:true,
+            allowGrowY:true,
+            decorator:null,
+            statusBarVisible:false
+            });
+      var tcm = this.compileroutput.getTableColumnModel();
+
+      var resizeBehavior = tcm.getBehavior();
+
+      resizeBehavior.setWidth(0, "20%");
+      resizeBehavior.setWidth(1, "10%");
+      resizeBehavior.setWidth(2, "70%");
       
-      var l2 = new qx.ui.basic.Label("Lorem ipsum dolor sit amet");
-      l2.setRich(true);
-      l2.setDecorator("main");
-      l2.setAllowGrowX(true);
+      this.editors = new carpo.EditorsPane();
+      
+      this.editors.setDecorator("main");
+      this.editors.setAllowGrowX(true);
+      this.editors.setAllowGrowY(true);
+
       var tree = new qx.ui.treevirtual.TreeVirtual("Workspace");
       //tree.setColumnWidth(0, 400);
       tree.setAlwaysShowOpenCloseSymbol(true);
@@ -86,7 +108,7 @@ qx.Class.define("carpo.Application",
          if (node.type == qx.ui.treevirtual.MTreePrimitive.Type.LEAF) {
              var pt = this.filepathFromNode(tree, node);
              this.workspace.loadFile (pt, function (data) {
-                editors.openEditor(pt, node.label, data.content);                 
+                app.editors.openEditor(pt, node.label, data.content, data.filemode);                 
              });
          } else {
              dm.setState(node, {bOpened:!node.bOpened});
@@ -105,7 +127,9 @@ qx.Class.define("carpo.Application",
       }, this);
       
       pane.add(tree,1);
-      pane.add(editors,4);
+      pane2.add(this.editors,4);
+      pane2.add(this.compileroutput, 1);
+      pane.add(pane2,4);
       container.add(pane, {flex:1});
       this.getRoot().add(container, {width:"100%", height:"100%"});
 
@@ -140,7 +164,7 @@ qx.Class.define("carpo.Application",
         var pt = h.reduce(function (prev,cur) {
             return prev+cur+"/";
         },"/");
-        return pt;
+        return pt.slice(0,-1);
     },
     
     buildTreeNodes : function (treemodel, parnode, path) {
@@ -161,14 +185,22 @@ qx.Class.define("carpo.Application",
       });     
     },
     refreshConfig : function (cb) {
+        var app = this;
         this.workspace.loadconfig (function (data) {
             // config data is a pure string ...
-            this._configuration = qx.lang.Json.parse(data);
-            cb(this._configuration);
+            app._configuration = qx.lang.Json.parse(data);
+            cb(app._configuration);
         });
     },
     getConfig : function ()  {
         return this._configuration;
+    },
+    
+    createCommands : function () {
+      this._saveCommand = new qx.ui.core.Command("Ctrl+S");
+      this._saveCommand.addListener("execute", this.saveFile, this);
+      this._settingsCommand = new qx.ui.core.Command();
+      this._settingsCommand.addListener("execute", this.showSettings, this);
     },
     
     getMenuBar : function() {
@@ -179,6 +211,7 @@ qx.Class.define("carpo.Application",
       frame.add(menubar);
 
       var fileMenu = new qx.ui.menubar.Button("File", null, this.getFileMenu());
+      var viewMenu = new qx.ui.menubar.Button("View", null, this.getViewMenu());
       //var editMenu = new qx.ui.menubar.Button("Edit", null, this.getEditMenu());
       //var searchMenu = new qx.ui.menubar.Button("Search", null, this.getSearchMenu());
       //var viewMenu = new qx.ui.menubar.Button("View", null, this.getViewMenu());
@@ -186,6 +219,8 @@ qx.Class.define("carpo.Application",
       //var helpMenu = new qx.ui.menubar.Button("Help", null, this.getHelpMenu());
 
       menubar.add(fileMenu);
+      menubar.add(viewMenu);
+      
       //menubar.add(editMenu);
       //menubar.add(searchMenu);
       //menubar.add(viewMenu);
@@ -195,35 +230,65 @@ qx.Class.define("carpo.Application",
       return frame;
     },
 
-    getFileMenu : function()
-    {
+    getViewMenu : function () {
+        var menu = new qx.ui.menu.Menu();
+        var settings = new qx.ui.menu.Button("Settings",null, this._settingsCommand);
+        menu.add(settings);
+        return menu;
+    },
+    getFileMenu : function() {
       var menu = new qx.ui.menu.Menu();
 
-      var newButton = new qx.ui.menu.Button("New", "icon/16/actions/document-new.png", this._newCommand);
-      var openButton = new qx.ui.menu.Button("Open", "icon/16/actions/document-open.png", this._openCommand);
-      var closeButton = new qx.ui.menu.Button("Close");
+      //var newButton = new qx.ui.menu.Button("New", "icon/16/actions/document-new.png", this._newCommand);
+      //var openButton = new qx.ui.menu.Button("Open", "icon/16/actions/document-open.png", this._openCommand);
+      //var closeButton = new qx.ui.menu.Button("Close");
       var saveButton = new qx.ui.menu.Button("Save", "icon/16/actions/document-save.png", this._saveCommand);
-      var saveAsButton = new qx.ui.menu.Button("Save as...", "icon/16/actions/document-save-as.png");
-      var printButton = new qx.ui.menu.Button("Print", "icon/16/actions/document-print.png");
-      var exitButton = new qx.ui.menu.Button("Exit", "icon/16/actions/application-exit.png");
+      //var saveAsButton = new qx.ui.menu.Button("Save as...", "icon/16/actions/document-save-as.png");
+      //var printButton = new qx.ui.menu.Button("Print", "icon/16/actions/document-print.png");
+      //var exitButton = new qx.ui.menu.Button("Exit", "icon/16/actions/application-exit.png");
 
-      newButton.addListener("execute", this.debugButton);
-      openButton.addListener("execute", this.debugButton);
-      closeButton.addListener("execute", this.debugButton);
-      saveButton.addListener("execute", this.debugButton);
-      saveAsButton.addListener("execute", this.debugButton);
-      printButton.addListener("execute", this.debugButton);
-      exitButton.addListener("execute", this.debugButton);
+      //newButton.addListener("execute", this.debugButton);
+      //openButton.addListener("execute", this.debugButton);
+      //closeButton.addListener("execute", this.debugButton);
+      //saveButton.addListener("execute", this.debugButton);
+      //saveAsButton.addListener("execute", this.debugButton);
+      //printButton.addListener("execute", this.debugButton);
+      //exitButton.addListener("execute", this.debugButton);
 
-      menu.add(newButton);
-      menu.add(openButton);
-      menu.add(closeButton);
+      //menu.add(newButton);
+      //menu.add(openButton);
+      //menu.add(closeButton);
       menu.add(saveButton);
-      menu.add(saveAsButton);
-      menu.add(printButton);
-      menu.add(exitButton);
+      //menu.add(saveAsButton);
+      //menu.add(printButton);
+      //menu.add(exitButton);
 
       return menu;
+    },
+    
+    saveFile : function (evt) {
+        var editor = this.editors.getCurrentEditor ();
+        var config = this.getConfig();
+        if (editor) {
+            var data = editor.getEditorData();
+            data.build = true;
+            var builder = config.apptype;
+            if (builder) {
+                data.buildtype = builder;
+                data.builder = config[builder];
+            }
+            this.workspace.saveFile(data.path, data, function (rsp) {
+                console.log(rsp);
+            });
+        }
+    },
+    
+    showSettings : function(evt) {
+        var s = new carpo.Settings();
+        s.setModal(true);
+        s.moveTo(100,100);
+        s.open();
+        this.getRoot().add(s);
     },
     
     debugButton : function (event) {

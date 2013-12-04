@@ -76,11 +76,11 @@ qx.Class.define("carpo.EditorsPane",
       this.setContentPadding(0,0,0,0);
     },
     members: {
-        openEditor : function (path, title, content) {
+        openEditor : function (path, title, content, filemode) {
             if (this._openeditors[path] != null) {
                 this.setSelection(new Array(this._openeditors[path]));
             } else {
-                var page = new carpo.Editor(path, title, content);
+                var page = new carpo.Editor(path, title, content, filemode);
                 page.addListener ("close", function (evt) {
                     this.editorClosed (evt.getTarget());
                 }, this);
@@ -92,6 +92,10 @@ qx.Class.define("carpo.EditorsPane",
         editorClosed : function (page) {
             // check if dirty and ask to save ...
             this._openeditors[page.getFilepath()] = null;
+        },
+        
+        getCurrentEditor : function () {
+            return this.getSelection()[0];
         }
     }
 });
