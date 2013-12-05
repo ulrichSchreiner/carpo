@@ -266,7 +266,7 @@ func (serv *workspace) touch(request *restful.Request, response *restful.Respons
 }
 
 func (serv *workspace) saveConfig(request *restful.Request, response *restful.Response) {
-	f, err := os.Create(filepath.Join(serv.Path, ".carpo"))
+	f, err := os.Create(filepath.Join(serv.Path, ".carpo.json"))
 	if err != nil {
 		sendError(response, http.StatusBadRequest, fmt.Errorf("Error create config: %s", err))
 		return
@@ -278,9 +278,10 @@ func (serv *workspace) saveConfig(request *restful.Request, response *restful.Re
 }
 
 func (serv *workspace) loadConfig(request *restful.Request, response *restful.Response) {
-	f, err := os.Open(filepath.Join(serv.Path, ".carpo"))
+	f, err := os.Open(filepath.Join(serv.Path, ".carpo.json"))
 	if err != nil {
-		sendError(response, http.StatusBadRequest, fmt.Errorf("Error opening config: %s", err))
+		//sendError(response, http.StatusBadRequest, fmt.Errorf("Error opening config: %s", err))
+		response.Write([]byte("{}"))
 		return
 	}
 	defer f.Close()
@@ -375,7 +376,7 @@ func NewWorkspace(path string) error {
 	w.Register(wsContainer)
 
 	http.Handle("/workspace/", Log(wsContainer))
-	http.Handle("/wsworkspace", Log(websocket.Handler(WorkspaceHandler(&w))))
+	//http.Handle("/wsworkspace", Log(websocket.Handler(WorkspaceHandler(&w))))
 	return nil
 }
 

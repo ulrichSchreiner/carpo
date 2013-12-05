@@ -52,6 +52,10 @@ qx.Class.define("carpo.Editor",
             var container = this.__editor.getContentElement().getDomElement();
             container.style.font = this._fontFromConfig();
         },
+        showAnnotations : function (annos) {
+            this.__ace.getSession().clearAnnotations();
+            this.__ace.getSession().setAnnotations(annos);
+        },
         __onEditorAppear : function () {
             qx.event.Timer.once(function() {
                 var self = this;

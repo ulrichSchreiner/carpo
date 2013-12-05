@@ -17,6 +17,7 @@ const (
 	BUILD_COMMAND = "install"
 	TEST_COMMAND  = "test"
 	WORKDIR       = ".carpowork"
+	ABSSRC        = "/src/"
 )
 
 var (
@@ -25,13 +26,15 @@ var (
 )
 
 type BuildResult struct {
-	Original  string `json:"original"`
-	File      string `json:"file"`
-	Directory string `json:"directory"`
-	Source    string `json:"source"`
-	Line      int    `json:"line"`
-	Column    int    `json:"column"`
-	Message   string `json:"message"`
+	Original          string `json:"original"`
+	File              string `json:"file"`
+	Directory         string `json:"directory"`
+	Source            string `json:"source"`
+	Line              int    `json:"line"`
+	Column            int    `json:"column"`
+	Message           string `json:"message"`
+	PackageName       string `json:"packagename"`
+	PackageImportPath string `json:"packageimportpath"`
 }
 
 type GoWorkspace struct {
@@ -101,11 +104,11 @@ func (ws *GoWorkspace) importPackage(packname string, path string) error {
 	if err != nil {
 		return err
 	} else {
-		if bytes.Compare([]byte(pack.Name), []byte("main")) != 0 {
-			ws.Packages[packname] = pack
-			ws.addDependency(pack, pack.Imports)
-			ws.addTestDependency(pack, pack.TestImports)
-		}
+		//if bytes.Compare([]byte(pack.Name), []byte("main")) != 0 {
+		ws.Packages[packname] = pack
+		ws.addDependency(pack, pack.Imports)
+		ws.addTestDependency(pack, pack.TestImports)
+		//}
 	}
 	return nil
 }
@@ -179,7 +182,8 @@ func (ws *GoWorkspace) BuildPackage(base string, gotool string, packdir string) 
 			dirs = append(dirs, ws.findDirectoryFromPackage(d))
 		}
 	}
-	res, err := ws.build(gotool, args...)
+	packagesToRecompile := args
+	res, err := ws.build(gotool, packagesToRecompile...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -193,8 +197,9 @@ func (ws *GoWorkspace) BuildPackage(base string, gotool string, packdir string) 
 		}
 	}
 	res = res + "\n" + ws.buildtests(gotool, args...)
-	parsed := parseBuildOutput(base, res)
-	return &parsed, &dirs, nil
+	parsed := ws.parseBuildOutput(base, res)
+	ws.Build = ws.mergeBuildResults(packagesToRecompile, parsed)
+	return &ws.Build, &dirs, nil
 }
 
 func (ws *GoWorkspace) FullBuild(base string, gotool string) (*[]BuildResult, *[]string, error) {
@@ -208,8 +213,25 @@ func (ws *GoWorkspace) FullBuild(base string, gotool string) (*[]BuildResult, *[
 	if err != nil {
 		return nil, nil, err
 	}
-	parsed := parseBuildOutput(base, res)
-	return &parsed, &dirs, nil
+	parsed := ws.parseBuildOutput(base, res)
+	ws.Build = parsed
+	return &ws.Build, &dirs, nil
+}
+
+func (ws *GoWorkspace) mergeBuildResults(compiledPackages []string, res []BuildResult) []BuildResult {
+	var bs []BuildResult
+	m := make(map[string]bool)
+	for _, s := range compiledPackages {
+		m[s] = true
+	}
+	log.Printf("merging packages: %+v with res: %+v", compiledPackages, res)
+	for _, br := range ws.Build {
+		if _, ok := m[br.PackageImportPath]; !ok {
+			bs = append(bs, br)
+		}
+	}
+	bs = append(bs, res...)
+	return bs
 }
 
 func (ws *GoWorkspace) gocmd(gobin string, command string, dir string, args ...string) (string, error) {
@@ -249,7 +271,7 @@ func (ws *GoWorkspace) buildtests(gobin string, args ...string) string {
 	}
 	return res
 }
-func parseBuildOutput(base string, output string) []BuildResult {
+func (ws *GoWorkspace) parseBuildOutput(base string, output string) []BuildResult {
 	var res []BuildResult
 	lines := strings.Split(output, "\n")
 	for _, l := range lines {
@@ -262,6 +284,12 @@ func parseBuildOutput(base string, output string) []BuildResult {
 			// we always work in a subdirectory named ".carpowork", so strip the ".." from the filepath
 			br.File = br.Source[2:]
 			br.Directory = filepath.Dir(br.File)
+			pt, err := ws.findPackageFromDirectory(filepath.Join(base, br.Directory))
+			if err != nil {
+				log.Printf("cannot find package for directory '%s': %s", br.Directory, err)
+			} else {
+				br.PackageImportPath = pt
+			}
 			br.Message = string(m[len(m)-1])
 			sourceline := strings.Split(string(m[2]), ":")[0]
 			ln, err := strconv.ParseInt(sourceline, 10, 0)

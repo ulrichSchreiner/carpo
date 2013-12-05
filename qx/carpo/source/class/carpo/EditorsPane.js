@@ -90,6 +90,9 @@ qx.Class.define("carpo.EditorsPane",
                 this.setSelection(new Array(page));
             }
         },
+        getEditorFor : function (path) {
+            return this._openeditors[path];
+        },
         editorClosed : function (page) {
             // check if dirty and ask to save ...
             this._openeditors[page.getFilepath()] = null;
@@ -98,7 +101,28 @@ qx.Class.define("carpo.EditorsPane",
         getCurrentEditor : function () {
             return this.getSelection()[0];
         },
-        
+        showAnnotations : function (probs) {
+            var self = this;
+            var annotations = {};
+            probs.forEach (function (p) {
+                var ed = self.getEditorFor(p.file);
+                if (ed) {
+                    var annos = annotations[p.file];
+                    if (!annos) annos = [];
+                    annotations[p.file] = annos;
+                    annos.push({
+                       row:p.line-1,
+                       column:p.column,
+                       text:p.message,
+                       type:"error"                        
+                    });
+                }
+            });
+            for (var ed in annotations) {
+                self.getEditorFor(ed).showAnnotations(annotations[ed]);
+            }
+        },
+
         configChanged : function (config) {
             this._config = config;
             for (var ek in this._openeditors) {
