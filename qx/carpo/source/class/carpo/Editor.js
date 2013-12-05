@@ -1,6 +1,7 @@
 qx.Class.define("carpo.Editor",
 {
     extend : qx.ui.tabview.Page,
+   
     properties : {
         filepath: { init: null },
         filename: { init: null },
@@ -44,8 +45,16 @@ qx.Class.define("carpo.Editor",
                 mode:this.getMode()
             };
         },
-        setEditorValue : function (val) {
-            this.__ace.getSession().setValue(val);
+        setEditorValue : function (val, clean) {
+          var pos = this.__ace.getCursorPosition();
+          this.__ace.getSession().setValue(val);
+          if (pos) {
+            this.__ace.moveCursorToPosition(pos);
+            this.__ace.scrollToLine(pos.row, true, false, function() {});
+          }
+          if (clean) {
+            this.setLabel(this.getFilename());
+          }
         },
         configChanged : function (config) {
             this.setConfig(config);
@@ -53,8 +62,20 @@ qx.Class.define("carpo.Editor",
             container.style.font = this._fontFromConfig();
         },
         showAnnotations : function (annos) {
+          if (this.__ace) {
+            this.__annotations = null;
             this.__ace.getSession().clearAnnotations();
-            this.__ace.getSession().setAnnotations(annos);
+            this.__ace.getSession().setAnnotations(annos);            
+          } else {
+            this.__annotations = annos;
+          }
+        },
+        refreshEditor : function () {
+          var ace = this.__ace;
+          if (ace)
+            window.setTimeout(function() {
+              ace.resize();
+            }, 0);
         },
         __onEditorAppear : function () {
             qx.event.Timer.once(function() {
@@ -74,17 +95,19 @@ qx.Class.define("carpo.Editor",
                 var session = editor.getSession();
                 session.setUseSoftTabs(true);
                 session.setTabSize(2);
+                session.setValue(this.getContent() || "");
+                if (this.__annotations) {
+                  this.showAnnotations(this.__annotations);                  
+                }
                 session.on('change', function(e) {
                     self.setContent(session.getValue());
+                    self.setLabel("*"+self.getFilename());
                 });
-                // copy the inital value
-                session.setValue(this.getContent() || "");
-        
                 // append resize listener
                 this.__editor.addListener("resize", function() {
                   // use a timeout to let the layout queue apply its changes to the dom
                   window.setTimeout(function() {
-                    self.__ace.resize();
+                    self.__ace.resize();                  
                   }, 0);
                 });
             }, this, 100);            

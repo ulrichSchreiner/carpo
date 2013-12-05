@@ -5,7 +5,9 @@
 qx.Class.define("carpo.EditorsPane",
 {
   extend : qx.ui.tabview.TabView,
-
+    events : {
+      "fileSelected"   : "qx.event.type.Data"
+    },
     statics : {
         loadAce : function(clb, ctx) {
             var resource = [
@@ -75,11 +77,20 @@ qx.Class.define("carpo.EditorsPane",
       this._openeditors = {};
       this.setContentPadding(0,0,0,0);
       this._config = config;
+      this.addListener ("changeSelection", function (evt) {
+        var editor = evt.getData()[0];
+        if (editor) {
+          editor.refreshEditor ();
+          qx.event.Timer.once(function() {
+            this.fireDataEvent("fileSelected",{name:editor.getFilename(),path:editor.getFilepath()})
+          }, this, 50);
+        }
+      }, this);
     },
     members: {
         openEditor : function (path, title, content, filemode) {
             if (this._openeditors[path]) {
-                this.setSelection(new Array(this._openeditors[path]));
+                this.showEditor(this._openeditors[path]);
             } else {
                 var page = new carpo.Editor(path, title, content, filemode, this._config);
                 page.addListener ("close", function (evt) {
@@ -92,6 +103,9 @@ qx.Class.define("carpo.EditorsPane",
         },
         getEditorFor : function (path) {
             return this._openeditors[path];
+        },
+        showEditor : function (ed) {
+          this.setSelection([ed]);
         },
         editorClosed : function (page) {
             // check if dirty and ask to save ...
@@ -118,6 +132,11 @@ qx.Class.define("carpo.EditorsPane",
                     });
                 }
             });
+            // first clear all annotations
+            for (var p in this._openeditors) {
+              this._openeditors[p].showAnnotations([]);
+            }
+            // then show the annotations
             for (var ed in annotations) {
                 self.getEditorFor(ed).showAnnotations(annotations[ed]);
             }

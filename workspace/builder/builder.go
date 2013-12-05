@@ -104,11 +104,11 @@ func (ws *GoWorkspace) importPackage(packname string, path string) error {
 	if err != nil {
 		return err
 	} else {
-		//if bytes.Compare([]byte(pack.Name), []byte("main")) != 0 {
-		ws.Packages[packname] = pack
-		ws.addDependency(pack, pack.Imports)
-		ws.addTestDependency(pack, pack.TestImports)
-		//}
+		if bytes.Compare([]byte(pack.Name), []byte("main")) != 0 {
+			ws.Packages[packname] = pack
+			ws.addDependency(pack, pack.Imports)
+			ws.addTestDependency(pack, pack.TestImports)
+		}
 	}
 	return nil
 }

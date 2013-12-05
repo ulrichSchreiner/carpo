@@ -95,7 +95,6 @@ qx.Class.define("carpo.Application",
         resizeBehavior.setWidth(2, "70%");
         
         this.editors = new carpo.EditorsPane(null);
-        
         this.editors.setDecorator("main");
         this.editors.setAllowGrowX(true);
         this.editors.setAllowGrowY(true);
@@ -119,7 +118,7 @@ qx.Class.define("carpo.Application",
         }, this);
         toolbar.add (this.browserfilter, {flex:1});
         toolbar.add(new qx.ui.toolbar.Separator());
-        var syncButton = new qx.ui.form.Button(null,"icon/16/actions/go-previous.png");
+        var syncButton = new qx.ui.form.ToggleButton(null,"icon/16/actions/go-previous.png");
         toolbar.add(syncButton);
         browser.add(toolbar);
         
@@ -136,7 +135,8 @@ qx.Class.define("carpo.Application",
             if (node.type == qx.ui.treevirtual.MTreePrimitive.Type.LEAF) {
                 var pt = this.filepathFromNode(tree, node);
                 this.workspace.loadFile (pt, function (data) {
-                    app.editors.openEditor(pt, node.label, data.content, data.filemode);                 
+                    app.editors.openEditor(pt, node.label, data.content, data.filemode);     
+                    app.showAnnotations();
                 });
             } else {
                 dm.setState(node, {bOpened:!node.bOpened});
@@ -151,6 +151,10 @@ qx.Class.define("carpo.Application",
             var node = e.getData();
             var pt = this.filepathFromNode(tree, node);
             this.buildTreeNodes(dm, node.nodeId, pt);         
+        }, this);
+        this.editors.addListener ("fileSelected", function(e) {
+          var path = e.getData().path;
+          console.log(dm.getData());
         }, this);
       
         browser.add(tree,{flex:1});
@@ -172,7 +176,7 @@ qx.Class.define("carpo.Application",
                 app.browserfilter.add(it);
             });
             app.browserfilter.setValue(config.browser.currentfilter);
-
+            app.build();
         });
     },
     filepathFromNode : function (tree, node) {
@@ -322,7 +326,8 @@ qx.Class.define("carpo.Application",
                 data.builder = config.settings.go[builder+"_path"];
             }
             this.workspace.saveFile(data.path, data, function (rsp) {
-                app.showBuildResult(rsp);
+              editor.setEditorValue(rsp.formattedcontent, true);
+              app.showBuildResult(rsp);
             });
         }
     },
@@ -343,11 +348,19 @@ qx.Class.define("carpo.Application",
     },
     showBuildResult : function (result) {
         var data = [];
-        result.buildoutput.forEach(function (o) {
-           data.push([o.file,o.line,o.message]); 
-        });
+        if (result && result.buildoutput) {
+          this.currentBuildoutput = result.buildoutput;
+          result.buildoutput.forEach(function (o) {
+             data.push([o.file,o.line,o.message]); 
+          });
+        } else {
+          this.currentBuildoutput = null;
+        }
+        this.showAnnotations();
         this.compileroutputModel.setData(data);
-        this.editors.showAnnotations(result.buildoutput);
+    },
+    showAnnotations : function () {
+      this.editors.showAnnotations(this.currentBuildoutput || []);
     },
     showError : function (src, line, message) {
         var app = this;
@@ -355,7 +368,10 @@ qx.Class.define("carpo.Application",
         if (!editor) {
             this.workspace.loadFile (src, function (data) {
                 app.editors.openEditor(src, data.title, data.content, data.filemode);                 
+                app.showAnnotations();
             });  
+        } else {
+          this.editors.showEditor(editor);
         }
     },
     showSettings : function(evt) {

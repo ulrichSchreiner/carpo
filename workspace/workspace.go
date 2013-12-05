@@ -23,7 +23,7 @@ type buildType string
 const (
 	BUILD_GOLANG             = "golang"
 	TYPE_GO        buildType = "go"
-	TYPE_APPENGINE buildType = "goapp"
+	TYPE_APPENGINE buildType = "appengine"
 )
 
 func (w *workspace) Register(container *restful.Container) {
@@ -362,15 +362,15 @@ func NewWorkspace(path string) error {
 		log.Printf("no go tool found in path: %s\n", err)
 	} else {
 		w.gotool = &gopath
+		log.Printf("go: %s", *w.gotool)
 	}
 	goapppath, err := exec.LookPath("goapp")
 	if err != nil {
 		log.Printf("no goapp tool found in path: %s\n", err)
 	} else {
 		w.goapptool = &goapppath
+		log.Printf("goapp: %s", *w.goapptool)
 	}
-	//log.Printf("go: %s", *w.gotool)
-	//log.Printf("goapp: %s", *w.goapptool)
 
 	wsContainer := restful.NewContainer()
 	w.Register(wsContainer)

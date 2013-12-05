@@ -125,10 +125,14 @@ qx.Class.define("carpo.Settings", {
                 minWidth:300
             });
             this.gopath = gopath;
+            if (this._settings.go.go_path) gopath.setValue(this._settings.go.go_path);
+            
             form.add(this.gopath, "Go Path");
             var goapppath = new qx.ui.form.TextField().set({
                 placeholder:"path to 'goapp' command (or search on PATH)"
             });
+            if (this._settings.go.goapp_path) gopath.setValue(this._settings.go.goapp_path);
+            
             this.goapppath = goapppath;
             form.add (this.goapppath, "GoApp Path");
             var selectBox = new qx.ui.form.SelectBox();
@@ -136,9 +140,9 @@ qx.Class.define("carpo.Settings", {
                 ["Go","go"],["AppEngine","appengine"]);
             apptypes.forEach(function (f) {
                 var item = new qx.ui.form.ListItem(f[0],null,f[1]);
-                //item.setRich(true);
                 selectBox.add(item);
             });
+            if (this._settings.go.apptype) selectBox.setModelSelection([this._settings.go.apptype]);
             this.apptype = selectBox;
             form.add (this.apptype, "Application Type");
             var page = new qx.ui.tabview.Page("Go");
