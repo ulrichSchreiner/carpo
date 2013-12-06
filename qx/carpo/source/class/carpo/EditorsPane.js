@@ -109,7 +109,8 @@ qx.Class.define("carpo.EditorsPane",
         },
         editorClosed : function (page) {
             // check if dirty and ask to save ...
-            this._openeditors[page.getFilepath()] = null;
+            //this._openeditors[page.getFilepath()] = null;
+            delete this._openeditors[page.getFilepath()];
         },
         
         getCurrentEditor : function () {

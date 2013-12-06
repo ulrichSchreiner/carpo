@@ -13,11 +13,14 @@
  *
  * @asset(carpo/*)
  * @asset(qx/icon/${qx.icontheme}/16/actions/*)
+ * @asset(qx/icon/${qx.icontheme}/32/status/*)
  */
 qx.Class.define("carpo.Application",
 {
   extend : qx.application.Standalone,
-
+  events : {
+    "configChanged"   : "qx.event.type.Data"
+  },
 
 
   /*
@@ -99,113 +102,40 @@ qx.Class.define("carpo.Application",
         this.editors.setAllowGrowX(true);
         this.editors.setAllowGrowY(true);
         
-        var browser = new qx.ui.container.Composite(new qx.ui.layout.VBox(2))
-            .set({decorator:null,allowGrowX:true,allowGrowY:true});
-        var toolbar = new qx.ui.toolbar.ToolBar();
-        toolbar.setSpacing(0);
-        this.browserfilter = new qx.ui.form.ComboBox();
-        this.browserfilter.addListener ("changeValue", function (e) {
-            var selectedFilter = e.getData();
-            this.getConfig().browser.currentfilter = selectedFilter;
-            var filter = qx.lang.Function.bind(function(node) {
-                var label = node.label;
-                if (selectedFilter.trim() !== "")
-                    return new RegExp(selectedFilter).exec(label) === null;
-                return true;
-            }, this);
-            dm.setFilter(filter);      
-            this.saveConfig();
+        var fb = new carpo.FileBrowser(this, this.workspace);
+        fb.addListener ("openFile", function (e) {
+          var path = e.getData().getPath();
+          var lbl = e.getData().getLabel();
+          this.workspace.loadFile (path, function (data) {
+              app.editors.openEditor(path, lbl, data.content, data.filemode);     
+              app.showAnnotations();
+          });          
         }, this);
-        toolbar.add (this.browserfilter, {flex:1});
-        toolbar.add(new qx.ui.toolbar.Separator());
-        var syncButton = new qx.ui.form.ToggleButton(null,"icon/16/actions/go-previous.png");
-        toolbar.add(syncButton);
-        browser.add(toolbar);
-        
-        var tree = new qx.ui.treevirtual.TreeVirtual("Workspace");
-        //tree.setColumnWidth(0, 400);
-        tree.setAlwaysShowOpenCloseSymbol(true);
-        tree.setDecorator("main");
-        tree.setAllowGrowX(true);
-        tree.setStatusBarVisible(false);
-        
-        var dm = tree.getDataModel();
-        tree.addListener("cellClick", function(ce) {
-            var node = dm.getNode(ce.getRow());
-            if (node.type == qx.ui.treevirtual.MTreePrimitive.Type.LEAF) {
-                var pt = this.filepathFromNode(tree, node);
-                this.workspace.loadFile (pt, function (data) {
-                    app.editors.openEditor(pt, node.label, data.content, data.filemode);     
-                    app.showAnnotations();
-                });
-            } else {
-                dm.setState(node, {bOpened:!node.bOpened});
-            }
-        }, this);
-        tree.addListener("treeOpenWithContent", function(e) {
-            var node = e.getData();
-            var pt = this.filepathFromNode(tree, node);
-            this.buildTreeNodes(dm, node.nodeId, pt);
-        }, this);
-        tree.addListener("treeOpenWhileEmpty", function(e) {
-            var node = e.getData();
-            var pt = this.filepathFromNode(tree, node);
-            this.buildTreeNodes(dm, node.nodeId, pt);         
-        }, this);
+
         this.editors.addListener ("fileSelected", function(e) {
           var path = e.getData().path;
-          console.log(dm.getData());
+          fb.selectNode(path);
         }, this);
-      
-        browser.add(tree,{flex:1});
-        pane.add(browser,1);
+
+        pane.add(fb, 1);
         pane2.add(this.editors,4);
         pane2.add(this.compileroutput, 1);
         pane.add(pane2,4);
         container.add(pane, {flex:1});
         this.getRoot().add(container, {width:"100%", height:"100%"});
         
-        this.buildTreeNodes (dm, null, "/");
         this._configuration = {};
         this.refreshConfig(function (config) {
             if (config.settings && config.settings.editor)
                 app.editors.configChanged(config.settings.editor);
-            app.browserfilter.removeAll();
-            config.browser.filterpatterns.forEach (function (f) {
-                var it = new qx.ui.form.ListItem(f,null,f);
-                app.browserfilter.add(it);
-            });
-            app.browserfilter.setValue(config.browser.currentfilter);
             app.build();
         });
     },
-    filepathFromNode : function (tree, node) {
-        var h = tree.getHierarchy(node.nodeId);
-        var pt = h.reduce(function (prev,cur) {
-            return prev+cur+"/";
-        },"/");
-        return pt.slice(0,-1);
+
+    currentSelectedEditorPath : function () {
+      return this.editors.getCurrentEditor().getFilepath();
     },
     
-    buildTreeNodes : function (treemodel, parnode, path) {
-        this.workspace.dir(path, function (data) {
-            if (parnode) {
-                treemodel.prune(parnode, false);
-            }
-            if (!data || !data.entries)
-                return;
-            data.entries.sort(function(a,b) {
-                return a.name.localeCompare(b.name);
-            }).forEach(function (el, idx) {
-            if (el.dir) {
-                treemodel.addBranch(parnode,el.name, false);
-            } else {
-                treemodel.addLeaf(parnode, el.name);
-            }
-          });
-          treemodel.setData();
-      });     
-    },
     refreshConfig : function (cb) {
         var app = this;
         this.workspace.loadconfig (function (data) {
@@ -213,10 +143,12 @@ qx.Class.define("carpo.Application",
             app._configuration = qx.lang.Json.parse(data);
             app._generateDefaultConfig(app._configuration);
             cb(app._configuration);
+            app.fireDataEvent("configChanged", app._configuration);
         }, function () {
             app._configuration = {};
             app._generateDefaultConfig(app._configuration);
             cb(app._configuration);
+            app.fireDataEvent("configChanged", app._configuration);
         });
     },
     _generateDefaultConfig : function (config) {
@@ -227,6 +159,14 @@ qx.Class.define("carpo.Application",
             config.browser.filterpatterns = ["^\\..*","pkg|bin|^\\..*"];
             config.browser.currentfilter = config.browser.filterpatterns[1];
         }        
+    },
+    setConfigValue : function (key, val) {
+      var keys = key.split(".");
+      var target = this.getConfig();
+      for (var i=0; i<keys.length-1; i++)
+        target = target[keys[i]];
+      target[keys[keys.length-1]] = val;
+      this.saveConfig();
     },
     
     saveConfig : function (cb) {
@@ -249,12 +189,11 @@ qx.Class.define("carpo.Application",
         this._buildCommand = new qx.ui.core.Command("Ctrl-B");
         this._buildCommand.addListener("execute", this.build, this);
     },
-    
+        
     getMenuBar : function() {
         var frame = new qx.ui.container.Composite(new qx.ui.layout.Grow());
-        
+        frame.setDecorator ("main");
         var menubar = new qx.ui.menubar.MenuBar();
-        //menubar.setWidth(600);
         frame.add(menubar);
         
         var fileMenu = new qx.ui.menubar.Button("File", null, this.getFileMenu());
@@ -387,6 +326,42 @@ qx.Class.define("carpo.Application",
             });            
         }, this);
         this.getRoot().add(s);
+    },
+    
+    
+    createModalTextInputDialog : function(title, message, cb) {
+      var dlg = new qx.ui.window.Window(title);
+      dlg.setLayout(new qx.ui.layout.VBox(10));
+      dlg.setModal(true);
+      dlg.setShowClose(false);
+      this.getRoot().add(dlg);
+
+      var msg = new qx.ui.basic.Atom(message, "icon/32/status/dialog-information.png");
+      dlg.add(msg);
+      var input = new qx.ui.form.TextField();
+      input.setAllowGrowX(true);
+      dlg.add(input, {flex:1});
+      
+      var box = new qx.ui.container.Composite();
+      box.setLayout(new qx.ui.layout.HBox(10, "right"));
+      dlg.add(box);
+
+      var btn3 = new qx.ui.form.Button("Ok", "icon/16/actions/dialog-ok.png");
+      btn3.addListener("execute", function(e) {
+        if (cb) {
+          cb(input.getValue());
+        }
+        dlg.close();
+      });
+      box.add(btn3);
+
+      var btn4 = new qx.ui.form.Button("Cancel", "icon/16/actions/dialog-cancel.png");
+      btn4.addListener("execute", function(e) {
+        dlg.close();
+      });
+      box.add(btn4);
+      dlg.center();
+      dlg.show();
     },
     
     debugButton : function (event) {
