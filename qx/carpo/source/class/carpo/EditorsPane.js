@@ -71,46 +71,112 @@ qx.Class.define("carpo.EditorsPane",
     },
 
 
-    construct : function(config)
+    construct : function(app, workspace, config)
     {
       this.base(arguments);
       this._openeditors = {};
       this.setContentPadding(0,0,0,0);
       this._config = config;
-      this.addListener ("changeSelection", function (evt) {
+      this._application = app;
+      this._workspace = workspace;
+      this.__silent = false;
+      app.addListener("configChanged", this._configChanged, this);
+      this.addListener ("changeSelection", function (evt) {        
+        var editors = this.getSelection();
+        if (!editors || editors.length === 0) return;
         var editor = evt.getData()[0];
         if (editor) {
           editor.refreshEditor ();
+          if (this.__silent) return;
           qx.event.Timer.once(function() {
-            this.fireDataEvent("fileSelected",{name:editor.getFilename(),path:editor.getFilepath()})
+            this.fireDataEvent("fileSelected",{name:editor.getFilename(),path:editor.getFilepath()});
           }, this, 50);
         }
       }, this);
     },
     members: {
+        _configChanged : function (e) {
+          if (this.__silent) return;
+          var config = e.getData();  
+          for (var ek in this._openeditors) {
+              var ed = this._openeditors[ek];
+              ed.configChanged (config);
+          }
+          
+          var current = null;
+          if (config.editors && config.editors.current)
+            current = config.editors.current;
+            
+          var self = this;
+          if (config.editors && config.editors.openfiles) {
+            this.__silent = true; // while this flag is set, the editor-state will not be saved
+            config.editors.openfiles.forEach(function (f) {
+              if (!self.getEditorFor(f)) {
+                self._workspace.loadFile (f, function (data) {
+                  self.__openEditor(f, data.title, data.content, data.filemode);     
+                });  
+              }
+            });
+            qx.event.Timer.once(function () {
+              this.__silent = false;
+              if (current) {
+                var ed = this.getEditorFor(current);
+                self.__showEditor(ed);
+              }
+            }, this, 100);
+          }
+        },
+        
+        saveEditorState : function () {
+          if (this.__silent) return;
+          this.__silent = true;
+          var editors = [];
+          for (var p in this._openeditors)
+            editors.push(p);
+          this._application.setConfigValue("editors.openfiles", editors);
+          var current = this.getCurrentEditor();
+          if (current)
+            this._application.setConfigValue("editors.current", current.getFilepath());
+          else
+            this._application.setConfigValue("editors.current", null);
+          this.__silent = false;
+        },
+        
         openEditor : function (path, title, content, filemode) {
-            if (this._openeditors[path]) {
-                this.showEditor(this._openeditors[path]);
-            } else {
-                var page = new carpo.Editor(path, title, content, filemode, this._config);
-                page.addListener ("close", function (evt) {
-                    this.editorClosed (evt.getTarget());
-                }, this);
-                this._openeditors[path] = page;
-                this.add(page);
-                this.setSelection(new Array(page));
-            }
+          var ed = this.__openEditor(path, title, content, filemode);
+          this.showEditor(ed);
+          this.saveEditorState();
+        },
+        
+        __openEditor : function (path, title, content, filemode) {
+          var ed = this._openeditors[path];
+          if (ed) {
+              return ed;
+          } else {
+              var page = new carpo.Editor(path, title, content, filemode, this._config);
+              page.addListener ("close", function (evt) {
+                  this.editorClosed (evt.getTarget());
+              }, this);
+              this._openeditors[path] = page;
+              this.add(page);
+              return page;
+          }
         },
         getEditorFor : function (path) {
             return this._openeditors[path];
         },
         showEditor : function (ed) {
+          this.__showEditor(ed);
+          this.saveEditorState ();
+        },
+        __showEditor : function (ed) {
           this.setSelection([ed]);
         },
         editorClosed : function (page) {
             // check if dirty and ask to save ...
             //this._openeditors[page.getFilepath()] = null;
             delete this._openeditors[page.getFilepath()];
+            this.saveEditorSate ();
         },
         
         getCurrentEditor : function () {
@@ -144,11 +210,13 @@ qx.Class.define("carpo.EditorsPane",
         },
 
         configChanged : function (config) {
+          /*
             this._config = config;
             for (var ek in this._openeditors) {
                 var ed = this._openeditors[ek];
                 ed.configChanged (config);
             }
+            */
         }
     }
 });

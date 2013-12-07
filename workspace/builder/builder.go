@@ -218,20 +218,31 @@ func (ws *GoWorkspace) FullBuild(base string, gotool string) (*[]BuildResult, *[
 	return &ws.Build, &dirs, nil
 }
 
-func (ws *GoWorkspace) mergeBuildResults(compiledPackages []string, res []BuildResult) []BuildResult {
-	var bs []BuildResult
+func (ws *GoWorkspace) mergeBuildResults(compiledPackages []string, res []BuildResult) (bs []BuildResult) {
 	m := make(map[string]bool)
 	for _, s := range compiledPackages {
 		m[s] = true
 	}
-	log.Printf("merging packages: %+v with res: %+v", compiledPackages, res)
 	for _, br := range ws.Build {
 		if _, ok := m[br.PackageImportPath]; !ok {
 			bs = append(bs, br)
 		}
 	}
-	bs = append(bs, res...)
-	return bs
+	for _, br := range res {
+		if !containsBuildResult(bs, br) {
+			bs = append(bs, br)
+		}
+	}
+	return
+}
+
+func containsBuildResult(results []BuildResult, br BuildResult) bool {
+	for _, b := range results {
+		if b == br {
+			return true
+		}
+	}
+	return false
 }
 
 func (ws *GoWorkspace) gocmd(gobin string, command string, dir string, args ...string) (string, error) {
@@ -251,16 +262,15 @@ func (ws *GoWorkspace) gocmd(gobin string, command string, dir string, args ...s
 	return string(res), nil
 }
 
-func (ws *GoWorkspace) build(gobin string, args ...string) (string, error) {
-	res, err := ws.gocmd(gobin, BUILD_COMMAND, ws.Workdir, args...)
+func (ws *GoWorkspace) build(gobin string, args ...string) (res string, err error) {
+	res, err = ws.gocmd(gobin, BUILD_COMMAND, ws.Workdir, args...)
 	if err == nil {
 		//res = res + "\n" + ws.buildtests(gobin, args...)
 	}
 	return res, err
 }
 
-func (ws *GoWorkspace) buildtests(gobin string, args ...string) string {
-	res := ""
+func (ws *GoWorkspace) buildtests(gobin string, args ...string) (res string) {
 	for _, p := range args {
 		if ws.packageHasTests(p) {
 			testres, testerr := ws.gocmd(gobin, TEST_COMMAND, ws.Workdir, "-c", p)
@@ -269,8 +279,9 @@ func (ws *GoWorkspace) buildtests(gobin string, args ...string) string {
 			}
 		}
 	}
-	return res
+	return
 }
+
 func (ws *GoWorkspace) parseBuildOutput(base string, output string) []BuildResult {
 	var res []BuildResult
 	lines := strings.Split(output, "\n")

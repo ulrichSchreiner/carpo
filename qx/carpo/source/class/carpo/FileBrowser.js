@@ -32,8 +32,11 @@ qx.Class.define("carpo.FileBrowser", {
       toolbar.add(this.syncButton);
       this.syncButton.addListener ("changeValue", function (e) {
         if (e.getData()) {
-          this._selectNode(this._application.currentSelectedEditorPath());      
+          var cureditorpath = this._application.currentSelectedEditorPath();
+          if (cureditorpath)
+            this._selectNode(cureditorpath);
         }
+        this._application.setConfigValue("browser.syncwitheditor", e.getData());
       }, this);
       this.add(toolbar);
       
@@ -88,29 +91,35 @@ qx.Class.define("carpo.FileBrowser", {
       },
       _selectNode : function (path) {
         this._refreshLock = true;
-        var selection = this._findNodesByPath(path);
-        this.tree.getSelection().push(selection[selection.length-1]);
-        this._refreshLock = false;
-      },
-      
-      _findNodesByPath : function (pt) {
-        var parts = pt.split("/");
-        var mod = this.model;
         var self = this;
-        var res = [mod];      
-        parts.forEach(function (p) {
-          var cn = self.findChildNode(mod, p);
-          if (cn) {
-            mod = cn;
-            if (mod.getDir() && !self.tree.isNodeOpen(cn)) {
-              self.tree.openNode(cn);
-            }
-            res.push(mod);
-          }
+        this._findNodesByPath(this.model, path.split("/").slice(1), function(mod) {
+          self.tree.openNodeAndParents(mod);
+          self.tree.getSelection().push(mod);
+          self._refreshLock = false;          
         });
-        return res;
       },
-      
+
+      _findNodesByPath : function (mod, path, cb) {
+        if (path.length === 0)
+          cb(mod);
+        else {
+          var key = path.shift();
+          var cn = this.findChildNode (mod, key);
+          if (cn) {
+            this._findNodesByPath(cn, path, cb);
+          } else {
+            var self = this;
+            this.loadContent(mod.getPath(), mod, function (newparent) {
+              var cn = self.findChildNode (newparent, key);
+              if (cn)
+                self._findNodesByPath(cn, path, cb);
+              else
+                cb(newparent);              
+            });
+          }
+        }
+      },
+            
       findChildNode : function (parnode, childlbl) {
         var childs = parnode.getChildren().toArray();
         for (var i=0; i<childs.length; i++) {
@@ -130,6 +139,8 @@ qx.Class.define("carpo.FileBrowser", {
             self.filter.add(it);
         });
         this.filter.setValue(config.browser.currentfilter);
+        if (config.browser.syncwitheditor)
+          this.syncButton.setValue(config.browser.syncwitheditor);
       },
       
       filterChanged : function (e) {

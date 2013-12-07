@@ -27,6 +27,18 @@ qx.Class.define("carpo.Editor",
     },
     
     members: {
+        jumpTo : function (row, col) {
+          if (this.__ace) {
+            var pos = {row:row-1,col:col};
+            this.__ace.moveCursorToPosition(pos);
+            this.__ace.scrollToLine(pos.row-1, true, false, function() {});
+            this.__ace.focus();
+            this.__pos = null;
+          } else {
+            this.__pos = {row:row,col:col};
+          }
+        },
+        
         _fontFromConfig : function () {
             var font = "14px monospace"
             if (this.getConfig() && this.getConfig().font) {
@@ -98,6 +110,12 @@ qx.Class.define("carpo.Editor",
                 session.setValue(this.getContent() || "");
                 if (this.__annotations) {
                   this.showAnnotations(this.__annotations);                  
+                }
+                if (this.__pos) {
+                  // do this a little later, because ace needs a little time to display content
+                  qx.event.Timer.once(function () {
+                    this.jumpTo(this.__pos.row, this.__pos.col);  
+                  },this,100);                  
                 }
                 session.on('change', function(e) {
                     self.setContent(session.getValue());

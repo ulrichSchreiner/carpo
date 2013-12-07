@@ -71,7 +71,7 @@ qx.Class.define("carpo.Application",
             allowGrowX: true
         });
         this.compileroutputModel = new qx.ui.table.model.Simple();
-        this.compileroutputModel.setColumns([ "Source", "Line", "Message" ]);
+        this.compileroutputModel.setColumns([ "Source", "Line", "Column","Message" ]);
         var custom = {
             tableColumnModel : function(obj) {
                 return new qx.ui.table.columnmodel.Resize(obj);
@@ -87,17 +87,18 @@ qx.Class.define("carpo.Application",
         this.compileroutput.addListener("cellDblclick", function (e) {
             var row = e.getRow();
             var data = this.compileroutputModel.getRowData(row);
-            this.showError (data[0], data[1], data[2]);
+            this.showError (data[0], data[1], data[2], data[3]);
         }, this);
         var tcm = this.compileroutput.getTableColumnModel();
 
         var resizeBehavior = tcm.getBehavior();
 
         resizeBehavior.setWidth(0, "20%");
-        resizeBehavior.setWidth(1, "10%");
-        resizeBehavior.setWidth(2, "70%");
+        resizeBehavior.setWidth(1, "5%");
+        resizeBehavior.setWidth(2, "5%");
+        resizeBehavior.setWidth(3, "70%");
         
-        this.editors = new carpo.EditorsPane(null);
+        this.editors = new carpo.EditorsPane(this, this.workspace, null);
         this.editors.setDecorator("main");
         this.editors.setAllowGrowX(true);
         this.editors.setAllowGrowY(true);
@@ -133,7 +134,9 @@ qx.Class.define("carpo.Application",
     },
 
     currentSelectedEditorPath : function () {
-      return this.editors.getCurrentEditor().getFilepath();
+      if (this.editors.getCurrentEditor())
+        return this.editors.getCurrentEditor().getFilepath();
+      return null;
     },
     
     refreshConfig : function (cb) {
@@ -163,8 +166,11 @@ qx.Class.define("carpo.Application",
     setConfigValue : function (key, val) {
       var keys = key.split(".");
       var target = this.getConfig();
-      for (var i=0; i<keys.length-1; i++)
+      for (var i=0; i<keys.length-1; i++) {
+        if (!(keys[i] in target))
+          target[keys[i]] = {};
         target = target[keys[i]];
+      }
       target[keys[keys.length-1]] = val;
       this.saveConfig();
     },
@@ -290,7 +296,7 @@ qx.Class.define("carpo.Application",
         if (result && result.buildoutput) {
           this.currentBuildoutput = result.buildoutput;
           result.buildoutput.forEach(function (o) {
-             data.push([o.file,o.line,o.message]); 
+             data.push([o.file,o.line,o.column, o.message]); 
           });
         } else {
           this.currentBuildoutput = null;
@@ -301,16 +307,18 @@ qx.Class.define("carpo.Application",
     showAnnotations : function () {
       this.editors.showAnnotations(this.currentBuildoutput || []);
     },
-    showError : function (src, line, message) {
+    showError : function (src, line, column, message) {
         var app = this;
         var editor = this.editors.getEditorFor(src);
         if (!editor) {
             this.workspace.loadFile (src, function (data) {
-                app.editors.openEditor(src, data.title, data.content, data.filemode);                 
+                var editor = app.editors.openEditor(src, data.title, data.content, data.filemode);
+                editor.jumpTo(line, column);
                 app.showAnnotations();
             });  
         } else {
           this.editors.showEditor(editor);
+          editor.jumpTo(line, column);
         }
     },
     showSettings : function(evt) {
