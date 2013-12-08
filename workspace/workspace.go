@@ -26,63 +26,63 @@ const (
 	TYPE_APPENGINE buildType = "appengine"
 )
 
-func (w *workspace) Register(container *restful.Container) {
+func (w *workspace) register(container *restful.Container) {
 	var ws restful.WebService
 	ws.
 		Path("/workspace").
 		Consumes(restful.MIME_JSON).
 		Produces(restful.MIME_JSON)
-	//ws.Route(ws.GET("/dir?path={path}").To(w.dir).Writes(Dir{}))
-	ws.Route(ws.GET("/dir").To(w.dir).Writes(Dir{}))
-	ws.Route(ws.GET("/mkdir").To(w.createdir).Writes(Dir{}))
-	ws.Route(ws.GET("/touch").To(w.touch).Writes(Dir{}))
-	ws.Route(ws.GET("/rm").To(w.rmfile).Writes(Dir{}))
-	ws.Route(ws.GET("/file").To(w.file).Writes(FileContent{}))
-	ws.Route(ws.POST("/file").To(w.save).Reads(FileSaveRequest{}).Writes(FileSaveResponse{}))
+	ws.Route(ws.GET("/dir").To(w.dir).Writes(dir{}))
+	ws.Route(ws.GET("/mkdir").To(w.createdir).Writes(dir{}))
+	ws.Route(ws.GET("/touch").To(w.touch).Writes(dir{}))
+	ws.Route(ws.GET("/rm").To(w.rmfile).Writes(dir{}))
+	ws.Route(ws.GET("/file").To(w.file).Writes(fileContent{}))
+	ws.Route(ws.POST("/file").To(w.save).Reads(fileSaveRequest{}).Writes(fileSaveResponse{}))
 	ws.Route(ws.POST("/config").To(w.saveConfig))
 	ws.Route(ws.GET("/config").To(w.loadConfig))
-	ws.Route(ws.POST("/build").To(w.buildWorkspace).Reads(BuildRequest{}).Writes(BuildResponse{}))
+	ws.Route(ws.POST("/build").To(w.buildWorkspace).Reads(buildRequest{}).Writes(buildResponse{}))
 	container.Add(&ws)
 }
 
-type DirEntry struct {
+type dirEntry struct {
 	Name  string `json:"name"`
 	IsDir bool   `json:"dir"`
 }
-type Dir struct {
+
+type dir struct {
 	Path        string     `json:"path"`
 	PathEntries []string   `json:"pathentries"`
-	Entries     []DirEntry `json:"entries"`
+	Entries     []dirEntry `json:"entries"`
 }
 
-type FileContent struct {
+type fileContent struct {
 	Content  string `json:"content"`
 	Title    string `json:"title"`
 	MimeType string `json:"mimetype"`
 	FileMode uint32 `json:"filemode"`
 }
 
-type BuildRequest struct {
+type buildRequest struct {
 	Build   bool      `json:"build"`
 	Builder string    `json:"builder"`
 	Type    buildType `json:"buildtype"`
 }
 
-type FileSaveRequest struct {
-	BuildRequest
+type fileSaveRequest struct {
+	buildRequest
 	Path    string `json:"path"`
 	Content string `json:"content"`
 	Mode    uint32 `json:"mode"`
 }
-type BuildResponse struct {
+type buildResponse struct {
 	Ok               bool                  `json:"ok"`
 	Message          string                `json:"message"`
 	BuildType        string                `json:"buildtype"`
 	BuiltDirectories []string              `json:"builtDirectories"`
 	BuildOutput      []builder.BuildResult `json:"buildoutput"`
 }
-type FileSaveResponse struct {
-	BuildResponse
+type fileSaveResponse struct {
+	buildResponse
 	FormattedContent string `json:"formattedcontent"`
 }
 
@@ -102,7 +102,7 @@ func (serv *workspace) getPathFromRequest(cpath string) (string, string, error) 
 	return filepath.Join(serv.Path, rpath), rpath, nil
 }
 func (serv *workspace) save(request *restful.Request, response *restful.Response) {
-	rq := new(FileSaveRequest)
+	rq := new(fileSaveRequest)
 	err := request.ReadEntity(&rq)
 	if err != nil {
 		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Request: %s", err))
@@ -126,7 +126,7 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 	fn := filepath.Base(path)
 	fp := filepath.Dir(path)
 	//golang.Parse(string(src), fn)
-	fres := FileSaveResponse{BuildResponse{true, "File saved", "", []string{}, []builder.BuildResult{}}, string(src)}
+	fres := fileSaveResponse{buildResponse{true, "File saved", "", []string{}, []builder.BuildResult{}}, string(src)}
 	if rq.Build {
 		if strings.HasSuffix(strings.ToLower(fn), ".go") {
 			builder := serv.findBuilder(rq.Type, rq.Builder)
@@ -165,7 +165,7 @@ func (serv *workspace) file(request *restful.Request, response *restful.Response
 		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Path: %s", err))
 		return
 	}
-	var result FileContent
+	var result fileContent
 	result.Title = filepath.Base(path)
 	f, err := os.Open(path)
 	if err != nil {
@@ -197,7 +197,7 @@ func (serv *workspace) dircontent(pt string, request *restful.Request, response 
 		return
 	}
 
-	var result Dir
+	var result dir
 	result.Path = rpath
 	if len(rpath) > 0 {
 		result.PathEntries = strings.Split(rpath, string(os.PathSeparator))
@@ -214,7 +214,7 @@ func (serv *workspace) dircontent(pt string, request *restful.Request, response 
 			sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot read contents of '%s': %s", rpath, err))
 		} else {
 			for _, fl := range flz {
-				result.Entries = append(result.Entries, DirEntry{fl.Name(), fl.IsDir()})
+				result.Entries = append(result.Entries, dirEntry{fl.Name(), fl.IsDir()})
 			}
 			response.WriteEntity(&result)
 		}
@@ -289,8 +289,8 @@ func (serv *workspace) loadConfig(request *restful.Request, response *restful.Re
 }
 
 func (serv *workspace) buildWorkspace(request *restful.Request, response *restful.Response) {
-	result := BuildResponse{true, "Full Build", "", []string{}, []builder.BuildResult{}}
-	rq := new(BuildRequest)
+	result := buildResponse{true, "Full Build", "", []string{}, []builder.BuildResult{}}
+	rq := new(buildRequest)
 	err := request.ReadEntity(&rq)
 	if err != nil {
 		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Build Request: %s", err))
@@ -338,7 +338,7 @@ type fileevent struct {
 	Renamed  bool
 }
 
-func Log(handler http.Handler) http.Handler {
+func logged(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%s %s %s", r.RemoteAddr, r.Method, r.URL)
 		handler.ServeHTTP(w, r)
@@ -373,10 +373,10 @@ func NewWorkspace(path string) error {
 	}
 
 	wsContainer := restful.NewContainer()
-	w.Register(wsContainer)
+	w.register(wsContainer)
 
-	http.Handle("/workspace/", Log(wsContainer))
-	//http.Handle("/wsworkspace", Log(websocket.Handler(WorkspaceHandler(&w))))
+	http.Handle("/workspace/", logged(wsContainer))
+	//http.Handle("/wsworkspace", logged(websocket.Handler(workspaceHandler(&w))))
 	return nil
 }
 
@@ -405,7 +405,7 @@ func transformEvent(ws *workspace, evt *fsnotify.FileEvent) (*fileevent, error) 
 	}
 	return &fe, nil
 }
-func WorkspaceHandler(works *workspace) websocket.Handler {
+func workspaceHandler(works *workspace) websocket.Handler {
 	return func(ws *websocket.Conn) {
 		watcher, err := fsnotify.NewWatcher()
 		if err != nil {
