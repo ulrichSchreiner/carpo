@@ -15,6 +15,7 @@ import (
 
 const (
 	BUILD_COMMAND = "install"
+	ENV_COMMAND   = "env"
 	TEST_COMMAND  = "test"
 	WORKDIR       = ".carpowork"
 	ABSSRC        = "/src/"
@@ -38,17 +39,20 @@ type BuildResult struct {
 }
 
 type GoWorkspace struct {
-	Packages map[string]*build.Package
-	Build    []BuildResult
-	Path     string
-	Workdir  string
-	GoPath   []string
+	Packages       map[string]*build.Package
+	SystemPackages map[string]*build.Package
+	Build          []BuildResult
+	Path           string
+	Workdir        string
+	GoPath         []string
+
 	// some private data
 	context          build.Context
 	neededBy         map[string][]string
 	dependencies     map[string][]string
 	testneededBy     map[string][]string
 	testdependencies map[string][]string
+	gobinpath        string
 }
 
 func (ws *GoWorkspace) findPackageFromDirectory(dir string) (string, error) {
@@ -99,11 +103,28 @@ func (ws *GoWorkspace) resolve() {
 	ws.resolveDeps(&ws.testdependencies, &ws.testneededBy)
 }
 
+func (ws *GoWorkspace) importSystemPackage(packname string, path string) error {
+	// systempackages are only imported at startup time so we only import them once
+	_, ok := ws.SystemPackages[packname]
+	if ok {
+		return nil
+	}
+	pack, err := ws.context.Import(packname, path, 0)
+	if err != nil {
+		return err
+	} else {
+		ws.SystemPackages[packname] = pack
+	}
+	return nil
+}
+
 func (ws *GoWorkspace) importPackage(packname string, path string) error {
 	pack, err := ws.context.Import(packname, path, 0)
 	if err != nil {
 		return err
 	} else {
+		//TODO change this, set a ignore-list in the workspace
+		//if bytes.Compare([]byte(pack.Name), []byte("testdata")) != 0 {
 		if bytes.Compare([]byte(pack.Name), []byte("main")) != 0 {
 			ws.Packages[packname] = pack
 			ws.addDependency(pack, pack.Imports)
@@ -114,41 +135,45 @@ func (ws *GoWorkspace) importPackage(packname string, path string) error {
 }
 
 type srcDir struct {
-	ws       *GoWorkspace
+	importer func(string, string) error
 	path     string
-	packages []build.Package
 }
 
 func (src *srcDir) walker(path string, info os.FileInfo, err error) error {
 	if !info.IsDir() {
 		if bytes.Compare([]byte(strings.ToLower(filepath.Ext(info.Name()))), GO_FILE_POSTFIX) == 0 {
 			// we have a go file :-)
+			//TODO: check if this directory was already imported
 			rel, err := filepath.Rel(src.path, path)
 			if err != nil {
-				// well if this happens, something terrible happend ...
+				// the walker found a subdir of "src.path" but filepath.Rel says no ...
+				// this cannot happen, but if this happens, something terrible happend ...
 			} else {
 				packname := filepath.Dir(rel)
-				src.ws.importPackage(packname, path)
+				src.importer(packname, path)
 			}
 		}
 	}
 	return nil
 }
-func Scan(gopath []string) *GoWorkspace {
+func Scan(gobin string, gopath []string) *GoWorkspace {
 	g := new(GoWorkspace)
+	g.gobinpath = gobin
 	g.Packages = make(map[string]*build.Package)
+	g.SystemPackages = make(map[string]*build.Package)
 	g.neededBy = make(map[string][]string)
 	g.dependencies = make(map[string][]string)
 	g.testneededBy = make(map[string][]string)
 	g.testdependencies = make(map[string][]string)
 	g.context = build.Default
+	log.Printf("DEFAULT GOPATH:%+v", g.context)
 	g.context.GOPATH = strings.Join(gopath, string(filepath.ListSeparator))
 	g.GoPath = gopath
 	for i, src := range gopath {
 		srcd := new(srcDir)
-		srcd.ws = g
+		srcd.importer = g.importPackage
 		srcd.path = filepath.Join(src, "src")
-		filepath.Walk(src, srcd.walker)
+		filepath.Walk(srcd.path, srcd.walker)
 		if i == 0 {
 			// first element in gopath is special
 			g.Path = src
@@ -157,16 +182,26 @@ func Scan(gopath []string) *GoWorkspace {
 			os.Mkdir(g.Workdir, 0755)
 		}
 	}
+	goroot, err := g.env("GOROOT")
+	if err != nil {
+		log.Printf("no system packages found, cannot detect GOROOT from '%s': %s", gobin, err)
+	} else {
+		srcSystem := new(srcDir)
+		srcSystem.importer = g.importSystemPackage
+		srcSystem.path = filepath.Join(goroot, "src", "pkg")
+		filepath.Walk(srcSystem.path, srcSystem.walker)
+	}
+
 	g.resolve()
 	return g
 }
 
-func (ws *GoWorkspace) BuildPackage(base string, gotool string, packdir string) (*[]BuildResult, *[]string, error) {
+func (ws *GoWorkspace) BuildPackage(base string, packdir string) (*[]BuildResult, *[]string, error) {
 	args := []string{}
 	dirs := []string{}
 	pack, err := ws.findPackageFromDirectory(packdir)
 	if err != nil {
-		return nil, nil, fmt.Errorf("findPacakgeFromDirectory: %s", err)
+		return nil, nil, fmt.Errorf("findPackageFromDirectory: %s", err)
 	}
 	err = ws.importPackage(pack, packdir)
 	if err != nil {
@@ -183,7 +218,7 @@ func (ws *GoWorkspace) BuildPackage(base string, gotool string, packdir string) 
 		}
 	}
 	packagesToRecompile := args
-	res, err := ws.build(gotool, packagesToRecompile...)
+	res, err := ws.build(packagesToRecompile...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -196,20 +231,20 @@ func (ws *GoWorkspace) BuildPackage(base string, gotool string, packdir string) 
 			dirs = append(dirs, ws.findDirectoryFromPackage(d))
 		}
 	}
-	res = res + "\n" + ws.buildtests(gotool, args...)
+	res = res + "\n" + ws.buildtests(args...)
 	parsed := ws.parseBuildOutput(base, res)
 	ws.Build = ws.mergeBuildResults(packagesToRecompile, parsed)
 	return &ws.Build, &dirs, nil
 }
 
-func (ws *GoWorkspace) FullBuild(base string, gotool string) (*[]BuildResult, *[]string, error) {
+func (ws *GoWorkspace) FullBuild(base string) (*[]BuildResult, *[]string, error) {
 	args := []string{}
 	dirs := []string{}
 	for p, _ := range ws.Packages {
 		args = append(args, p)
 		dirs = append(dirs, ws.findDirectoryFromPackage(p))
 	}
-	res, err := ws.build(gotool, args...)
+	res, err := ws.build(args...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -262,18 +297,26 @@ func (ws *GoWorkspace) gocmd(gobin string, command string, dir string, args ...s
 	return string(res), nil
 }
 
-func (ws *GoWorkspace) build(gobin string, args ...string) (res string, err error) {
-	res, err = ws.gocmd(gobin, BUILD_COMMAND, ws.Workdir, args...)
+func (ws *GoWorkspace) env(key string) (root string, err error) {
+	root, err = ws.gocmd(ws.gobinpath, ENV_COMMAND, ws.Workdir, key)
+	if err == nil {
+		root = strings.TrimSpace(root)
+	}
+	return
+}
+
+func (ws *GoWorkspace) build(args ...string) (res string, err error) {
+	res, err = ws.gocmd(ws.gobinpath, BUILD_COMMAND, ws.Workdir, args...)
 	if err == nil {
 		//res = res + "\n" + ws.buildtests(gobin, args...)
 	}
 	return res, err
 }
 
-func (ws *GoWorkspace) buildtests(gobin string, args ...string) (res string) {
+func (ws *GoWorkspace) buildtests(args ...string) (res string) {
 	for _, p := range args {
 		if ws.packageHasTests(p) {
-			testres, testerr := ws.gocmd(gobin, TEST_COMMAND, ws.Workdir, "-c", p)
+			testres, testerr := ws.gocmd(ws.gobinpath, TEST_COMMAND, ws.Workdir, "-c", p)
 			if testerr == nil && !strings.HasPrefix(testres, "?") {
 				res = res + "\n" + testres
 			}

@@ -86,6 +86,7 @@ qx.Class.define("carpo.EditorsPane",
         if (!editors || editors.length === 0) return;
         var editor = evt.getData()[0];
         if (editor) {
+          this.saveEditorState();
           editor.refreshEditor ();
           if (this.__silent) return;
           qx.event.Timer.once(function() {
@@ -117,35 +118,44 @@ qx.Class.define("carpo.EditorsPane",
                 });  
               }
             });
+            // real crappy code! normally i should wait until all open files are really
+            // loaded and after than i should select the "current" one. but this way it is
+            // more easily to implement, and most of the times it works. and if it does not
+            // work: well your current editor is not the same as in the last session (who cares :-)
             qx.event.Timer.once(function () {
               this.__silent = false;
               if (current) {
                 var ed = this.getEditorFor(current);
                 self.__showEditor(ed);
               }
-            }, this, 100);
+            }, this, 500);
           }
         },
         
         saveEditorState : function () {
           if (this.__silent) return;
           this.__silent = true;
+          var data = {};
           var editors = [];
           for (var p in this._openeditors)
             editors.push(p);
-          this._application.setConfigValue("editors.openfiles", editors);
+          data ["editors.openfiles"] = editors;
           var current = this.getCurrentEditor();
           if (current)
-            this._application.setConfigValue("editors.current", current.getFilepath());
+            data["editors.current"] = current.getFilepath();
           else
-            this._application.setConfigValue("editors.current", null);
+            data["editors.current"] = null;
+          this._application.setConfigValues(data);
           this.__silent = false;
         },
         
         openEditor : function (path, title, content, filemode) {
           var ed = this.__openEditor(path, title, content, filemode);
-          this.showEditor(ed);
-          this.saveEditorState();
+          if (ed != this.getCurrentEditor()) {
+            this.showEditor(ed);
+            this.saveEditorState();
+          }
+          return ed;
         },
         
         __openEditor : function (path, title, content, filemode) {
@@ -167,7 +177,8 @@ qx.Class.define("carpo.EditorsPane",
         },
         showEditor : function (ed) {
           this.__showEditor(ed);
-          this.saveEditorState ();
+          if (ed != this.getCurrentEditor())
+            this.saveEditorState ();
         },
         __showEditor : function (ed) {
           this.setSelection([ed]);
@@ -176,7 +187,7 @@ qx.Class.define("carpo.EditorsPane",
             // check if dirty and ask to save ...
             //this._openeditors[page.getFilepath()] = null;
             delete this._openeditors[page.getFilepath()];
-            this.saveEditorSate ();
+            this.saveEditorState ();
         },
         
         getCurrentEditor : function () {

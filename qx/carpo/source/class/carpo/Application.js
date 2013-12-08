@@ -164,6 +164,10 @@ qx.Class.define("carpo.Application",
         }        
     },
     setConfigValue : function (key, val) {
+      this._setConfigValue (key, val);
+      this.saveConfig();
+    },
+    _setConfigValue : function (key, val) {
       var keys = key.split(".");
       var target = this.getConfig();
       for (var i=0; i<keys.length-1; i++) {
@@ -172,6 +176,12 @@ qx.Class.define("carpo.Application",
         target = target[keys[i]];
       }
       target[keys[keys.length-1]] = val;
+    },
+    setConfigValues : function (overlay) {
+      for (var k in overlay) {
+        var val = overlay[k];
+        this._setConfigValue(k, val);
+      }
       this.saveConfig();
     },
     
@@ -265,14 +275,10 @@ qx.Class.define("carpo.Application",
             var app = this;
             var data = editor.getEditorData();
             data.build = true;
-            var builder = config.settings.go.apptype;
-            if (builder) {
-                data.buildtype = builder;
-                data.builder = config.settings.go[builder+"_path"];
-            }
             this.workspace.saveFile(data.path, data, function (rsp) {
               editor.setEditorValue(rsp.formattedcontent, true);
-              app.showBuildResult(rsp);
+              if (rsp.buildtype && rsp.buildtype == "golang")
+                app.showBuildResult(rsp);
             });
         }
     },
@@ -281,11 +287,6 @@ qx.Class.define("carpo.Application",
         var config = this.getConfig();
         var data = {};
         data.build = true;
-        var builder = config.settings.go.apptype;
-        if (builder) {
-            data.buildtype = builder;
-            data.builder = config.settings.go[builder+"_path"];
-        }
         var app = this;
         this.workspace.build(data, function (rsp) {
             app.showBuildResult(rsp);

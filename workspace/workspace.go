@@ -2,13 +2,13 @@ package workspace
 
 import (
 	"code.google.com/p/go.net/websocket"
+	"encoding/json"
 	"fmt"
 	"github.com/emicklei/go-restful"
 	"github.com/howeyc/fsnotify"
 	_ "github.com/ulrichSchreiner/carpo/golang"
 	"github.com/ulrichSchreiner/carpo/workspace/builder"
 	"go/format"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -22,8 +22,12 @@ type buildType string
 
 const (
 	BUILD_GOLANG             = "golang"
+	APPTYPE                  = "apptype"
 	TYPE_GO        buildType = "go"
 	TYPE_APPENGINE buildType = "appengine"
+
+	SETTING_GOPATH    = "go_path"
+	SETTING_GOAPPPATH = "goapp_path"
 )
 
 func (w *workspace) register(container *restful.Container) {
@@ -63,9 +67,8 @@ type fileContent struct {
 }
 
 type buildRequest struct {
-	Build   bool      `json:"build"`
-	Builder string    `json:"builder"`
-	Type    buildType `json:"buildtype"`
+	Build bool      `json:"build"`
+	Type  buildType `json:"buildtype"`
 }
 
 type fileSaveRequest struct {
@@ -129,18 +132,15 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 	fres := fileSaveResponse{buildResponse{true, "File saved", "", []string{}, []builder.BuildResult{}}, string(src)}
 	if rq.Build {
 		if strings.HasSuffix(strings.ToLower(fn), ".go") {
-			builder := serv.findBuilder(rq.Type, rq.Builder)
-			if builder != nil {
-				fres.BuildType = BUILD_GOLANG
-				output, dirs, err := serv.goworkspace.BuildPackage(serv.Path, *builder, fp)
-				if err != nil {
-					log.Printf("ERROR: %s\n", err)
-					fres.Message = err.Error()
-					fres.Ok = false
-				} else {
-					fres.BuildOutput = *output
-					fres.BuiltDirectories = *dirs
-				}
+			fres.BuildType = BUILD_GOLANG
+			output, dirs, err := serv.goworkspace.BuildPackage(serv.Path, fp)
+			if err != nil {
+				log.Printf("ERROR: %s\n", err)
+				fres.Message = err.Error()
+				fres.Ok = false
+			} else {
+				fres.BuildOutput = *output
+				fres.BuiltDirectories = *dirs
 			}
 		}
 	}
@@ -272,20 +272,38 @@ func (serv *workspace) saveConfig(request *restful.Request, response *restful.Re
 		return
 	}
 	defer f.Close()
-
-	io.Copy(f, request.Request.Body)
 	defer request.Request.Body.Close()
+
+	var conf interface{}
+	err = json.NewDecoder(request.Request.Body).Decode(&conf)
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Error parsing config: %s", err))
+		return
+	}
+	serv.config = conf.(map[string]interface{})
+	b, err := json.MarshalIndent(conf, "", "  ")
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Error writing config: %s", err))
+		return
+	}
+	f.Write(b)
+	//json.NewEncoder(f).Encode(conf)
 }
 
 func (serv *workspace) loadConfig(request *restful.Request, response *restful.Response) {
+	json.NewEncoder(response).Encode(serv.config)
+}
+
+func (serv *workspace) loadConfiguration() {
 	f, err := os.Open(filepath.Join(serv.Path, ".carpo.json"))
-	if err != nil {
-		//sendError(response, http.StatusBadRequest, fmt.Errorf("Error opening config: %s", err))
-		response.Write([]byte("{}"))
-		return
+	serv.config = make(map[string]interface{})
+	if err == nil {
+		defer f.Close()
+		err = json.NewDecoder(f).Decode(&serv.config)
+		if err != nil {
+			log.Printf("Cannot decode .carpo.json: %s", err)
+		}
 	}
-	defer f.Close()
-	io.Copy(response, f)
 }
 
 func (serv *workspace) buildWorkspace(request *restful.Request, response *restful.Response) {
@@ -296,24 +314,46 @@ func (serv *workspace) buildWorkspace(request *restful.Request, response *restfu
 		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Build Request: %s", err))
 		return
 	}
-	builder := serv.findBuilder(rq.Type, rq.Builder)
-	if builder != nil {
-		result.BuildType = BUILD_GOLANG
-		output, dirs, err := serv.goworkspace.FullBuild(serv.Path, *builder)
-		if err != nil {
-			log.Printf("Build ERROR: %s\n", err)
-			result.Message = err.Error()
-			result.Ok = false
-		} else {
-			result.BuildOutput = *output
-			result.BuiltDirectories = *dirs
-		}
-	} else {
-		result.Message = fmt.Sprintf("No Builder found for Apptype: %s", rq.Type)
+	result.BuildType = BUILD_GOLANG
+	output, dirs, err := serv.goworkspace.FullBuild(serv.Path)
+	if err != nil {
+		log.Printf("Build ERROR: %s\n", err)
+		result.Message = err.Error()
 		result.Ok = false
+	} else {
+		result.BuildOutput = *output
+		result.BuiltDirectories = *dirs
 	}
 
 	response.WriteEntity(&result)
+}
+
+func (serv *workspace) gobinpath() *string {
+	if wssettings, ok := serv.config["settings"]; ok {
+		settings := wssettings.(map[string]interface{})
+		if val, ok := settings["go"]; ok {
+			go_settings := val.(map[string]interface{})
+			apptype_s := go_settings[APPTYPE].(string)
+			apptype := buildType(apptype_s)
+			switch apptype {
+			case TYPE_GO:
+				gopath, _ := go_settings[SETTING_GOPATH]
+				if gopath != nil {
+					return gopath.(*string)
+				} else {
+					return serv.gotool
+				}
+			case TYPE_APPENGINE:
+				gopath, _ := go_settings[SETTING_GOAPPPATH]
+				if gopath != nil {
+					return gopath.(*string)
+				} else {
+					return serv.goapptool
+				}
+			}
+		}
+	}
+	return serv.gotool
 }
 
 func sendError(response *restful.Response, status int, err error) {
@@ -327,6 +367,7 @@ type workspace struct {
 	gotool      *string
 	goapptool   *string
 	goworkspace *builder.GoWorkspace
+	config      map[string]interface{}
 }
 
 type fileevent struct {
@@ -354,9 +395,8 @@ func NewWorkspace(path string) error {
 
 		path = filepath.Join(workdir, path)
 	}
-	gws := builder.Scan([]string{path})
-	w := workspace{path, nil, nil, nil, gws}
-
+	w := workspace{path, nil, nil, nil, nil, nil}
+	w.loadConfiguration()
 	gopath, err := exec.LookPath("go")
 	if err != nil {
 		log.Printf("no go tool found in path: %s\n", err)
@@ -371,6 +411,10 @@ func NewWorkspace(path string) error {
 		w.goapptool = &goapppath
 		log.Printf("goapp: %s", *w.goapptool)
 	}
+	gobinpath := w.gobinpath()
+	log.Printf("Workspace uses %s as go", *gobinpath)
+	gws := builder.Scan(*gobinpath, []string{path})
+	w.goworkspace = gws
 
 	wsContainer := restful.NewContainer()
 	w.register(wsContainer)
