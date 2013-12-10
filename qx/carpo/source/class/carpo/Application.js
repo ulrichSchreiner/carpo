@@ -331,7 +331,8 @@ qx.Class.define("carpo.Application",
             var app = this;
             app.getConfig().settings = e.getData();
             this.saveConfig (function () {
-                app.editors.configChanged(app.getConfig().settings.editor);    
+                //app.editors.configChanged(app.getConfig().settings.editor);    
+                app.fireDataEvent("configChanged", app._configuration);
             });            
         }, this);
         this.getRoot().add(s);

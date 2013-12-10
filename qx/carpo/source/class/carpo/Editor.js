@@ -41,8 +41,9 @@ qx.Class.define("carpo.Editor",
         
         _fontFromConfig : function () {
             var font = "14px monospace"
-            if (this.getConfig() && this.getConfig().font) {
-                var f = this.getConfig().font;
+            var config = this.getConfig();
+            if (config && config.settings.editor.font) {
+                var f = config.settings.editor.font;
                 font = f.size+"px "+f.name;
             }
             return font;
@@ -71,7 +72,8 @@ qx.Class.define("carpo.Editor",
         configChanged : function (config) {
             this.setConfig(config);
             var container = this.__editor.getContentElement().getDomElement();
-            container.style.font = this._fontFromConfig();
+            if (container)
+              container.style.font = this._fontFromConfig();
         },
         showAnnotations : function (annos) {
           if (this.__ace) {
