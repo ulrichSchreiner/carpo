@@ -13,47 +13,20 @@ import (
 	"strings"
 )
 
+type goCommand string
+
 const (
-	BUILD_COMMAND = "install"
-	ENV_COMMAND   = "env"
-	TEST_COMMAND  = "test"
-	WORKDIR       = ".carpowork"
-	ABSSRC        = "/src/"
+	goCommand_build goCommand = "install"
+	goCommand_env   goCommand = "env"
+	goCommand_test  goCommand = "test"
+	workdir                   = ".carpowork"
+	abssrc                    = "/src/"
 )
 
 var (
-	BUILD_LINE      = regexp.MustCompile("(.*?):(\\d*(:\\d*)?): (.*)")
-	GO_FILE_POSTFIX = []byte(".go")
+	build_line      = regexp.MustCompile("(.*?):(\\d*(:\\d*)?): (.*)")
+	go_file_postfix = []byte(".go")
 )
-
-type BuildResult struct {
-	Original          string `json:"original"`
-	File              string `json:"file"`
-	Directory         string `json:"directory"`
-	Source            string `json:"source"`
-	Line              int    `json:"line"`
-	Column            int    `json:"column"`
-	Message           string `json:"message"`
-	PackageName       string `json:"packagename"`
-	PackageImportPath string `json:"packageimportpath"`
-}
-
-type GoWorkspace struct {
-	Packages       map[string]*build.Package
-	SystemPackages map[string]*build.Package
-	Build          []BuildResult
-	Path           string
-	Workdir        string
-	GoPath         []string
-
-	// some private data
-	context          build.Context
-	neededBy         map[string][]string
-	dependencies     map[string][]string
-	testneededBy     map[string][]string
-	testdependencies map[string][]string
-	gobinpath        string
-}
 
 func (ws *GoWorkspace) findPackageFromDirectory(dir string) (string, error) {
 	for _, gp := range ws.GoPath {
@@ -141,7 +114,7 @@ type srcDir struct {
 
 func (src *srcDir) walker(path string, info os.FileInfo, err error) error {
 	if !info.IsDir() {
-		if bytes.Compare([]byte(strings.ToLower(filepath.Ext(info.Name()))), GO_FILE_POSTFIX) == 0 {
+		if bytes.Compare([]byte(strings.ToLower(filepath.Ext(info.Name()))), go_file_postfix) == 0 {
 			// we have a go file :-)
 			//TODO: check if this directory was already imported
 			rel, err := filepath.Rel(src.path, path)
@@ -155,102 +128,6 @@ func (src *srcDir) walker(path string, info os.FileInfo, err error) error {
 		}
 	}
 	return nil
-}
-func Scan(gobin string, gopath []string) *GoWorkspace {
-	g := new(GoWorkspace)
-	g.gobinpath = gobin
-	g.Packages = make(map[string]*build.Package)
-	g.SystemPackages = make(map[string]*build.Package)
-	g.neededBy = make(map[string][]string)
-	g.dependencies = make(map[string][]string)
-	g.testneededBy = make(map[string][]string)
-	g.testdependencies = make(map[string][]string)
-	g.context = build.Default
-	log.Printf("DEFAULT GOPATH:%+v", g.context)
-	g.context.GOPATH = strings.Join(gopath, string(filepath.ListSeparator))
-	g.GoPath = gopath
-	for i, src := range gopath {
-		srcd := new(srcDir)
-		srcd.importer = g.importPackage
-		srcd.path = filepath.Join(src, "src")
-		filepath.Walk(srcd.path, srcd.walker)
-		if i == 0 {
-			// first element in gopath is special
-			g.Path = src
-			g.Workdir = filepath.Join(g.Path, WORKDIR)
-			// ignore error if directory exists
-			os.Mkdir(g.Workdir, 0755)
-		}
-	}
-	goroot, err := g.env("GOROOT")
-	if err != nil {
-		log.Printf("no system packages found, cannot detect GOROOT from '%s': %s", gobin, err)
-	} else {
-		srcSystem := new(srcDir)
-		srcSystem.importer = g.importSystemPackage
-		srcSystem.path = filepath.Join(goroot, "src", "pkg")
-		filepath.Walk(srcSystem.path, srcSystem.walker)
-	}
-
-	g.resolve()
-	return g
-}
-
-func (ws *GoWorkspace) BuildPackage(base string, packdir string) (*[]BuildResult, *[]string, error) {
-	args := []string{}
-	dirs := []string{}
-	pack, err := ws.findPackageFromDirectory(packdir)
-	if err != nil {
-		return nil, nil, fmt.Errorf("findPackageFromDirectory: %s", err)
-	}
-	err = ws.importPackage(pack, packdir)
-	if err != nil {
-		// let's ignore this error, it will raise again when building...
-		//return nil, nil, fmt.Errorf("importPackage: %s", err)
-	}
-	args = append(args, pack)
-	dirs = append(dirs, ws.findDirectoryFromPackage(pack))
-	deps, ok := ws.neededBy[pack]
-	if ok {
-		args = append(args, deps...)
-		for _, d := range deps {
-			dirs = append(dirs, ws.findDirectoryFromPackage(d))
-		}
-	}
-	packagesToRecompile := args
-	res, err := ws.build(packagesToRecompile...)
-	if err != nil {
-		return nil, nil, err
-	}
-	// now for the tests ...
-	deps, ok = ws.testneededBy[pack]
-	args = []string{pack}
-	if ok {
-		args = append(args, deps...)
-		for _, d := range deps {
-			dirs = append(dirs, ws.findDirectoryFromPackage(d))
-		}
-	}
-	res = res + "\n" + ws.buildtests(args...)
-	parsed := ws.parseBuildOutput(base, res)
-	ws.Build = ws.mergeBuildResults(packagesToRecompile, parsed)
-	return &ws.Build, &dirs, nil
-}
-
-func (ws *GoWorkspace) FullBuild(base string) (*[]BuildResult, *[]string, error) {
-	args := []string{}
-	dirs := []string{}
-	for p, _ := range ws.Packages {
-		args = append(args, p)
-		dirs = append(dirs, ws.findDirectoryFromPackage(p))
-	}
-	res, err := ws.build(args...)
-	if err != nil {
-		return nil, nil, err
-	}
-	parsed := ws.parseBuildOutput(base, res)
-	ws.Build = parsed
-	return &ws.Build, &dirs, nil
 }
 
 func (ws *GoWorkspace) mergeBuildResults(compiledPackages []string, res []BuildResult) (bs []BuildResult) {
@@ -298,7 +175,7 @@ func (ws *GoWorkspace) gocmd(gobin string, command string, dir string, args ...s
 }
 
 func (ws *GoWorkspace) env(key string) (root string, err error) {
-	root, err = ws.gocmd(ws.gobinpath, ENV_COMMAND, ws.Workdir, key)
+	root, err = ws.gocmd(ws.gobinpath, string(goCommand_env), ws.Workdir, key)
 	if err == nil {
 		root = strings.TrimSpace(root)
 	}
@@ -306,7 +183,7 @@ func (ws *GoWorkspace) env(key string) (root string, err error) {
 }
 
 func (ws *GoWorkspace) build(args ...string) (res string, err error) {
-	res, err = ws.gocmd(ws.gobinpath, BUILD_COMMAND, ws.Workdir, args...)
+	res, err = ws.gocmd(ws.gobinpath, string(goCommand_build), ws.Workdir, args...)
 	if err == nil {
 		//res = res + "\n" + ws.buildtests(gobin, args...)
 	}
@@ -316,7 +193,7 @@ func (ws *GoWorkspace) build(args ...string) (res string, err error) {
 func (ws *GoWorkspace) buildtests(args ...string) (res string) {
 	for _, p := range args {
 		if ws.packageHasTests(p) {
-			testres, testerr := ws.gocmd(ws.gobinpath, TEST_COMMAND, ws.Workdir, "-c", p)
+			testres, testerr := ws.gocmd(ws.gobinpath, string(goCommand_test), ws.Workdir, "-c", p)
 			if testerr == nil && !strings.HasPrefix(testres, "?") {
 				res = res + "\n" + testres
 			}
@@ -330,7 +207,7 @@ func (ws *GoWorkspace) parseBuildOutput(base string, output string) []BuildResul
 	lines := strings.Split(output, "\n")
 	for _, l := range lines {
 		b := []byte(l)
-		m := BUILD_LINE.FindSubmatch(b)
+		m := build_line.FindSubmatch(b)
 		if m != nil {
 			var br BuildResult
 			br.Original = l

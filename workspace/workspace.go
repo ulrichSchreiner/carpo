@@ -413,7 +413,7 @@ func NewWorkspace(path string) error {
 	}
 	gobinpath := w.gobinpath()
 	log.Printf("Workspace uses %s as go", *gobinpath)
-	gws := builder.Scan(*gobinpath, []string{path})
+	gws := builder.NewGoWorkspace(*gobinpath, []string{path})
 	w.goworkspace = gws
 
 	wsContainer := restful.NewContainer()

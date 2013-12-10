@@ -188,13 +188,27 @@ qx.Class.define("carpo.FileBrowser", {
           }
         });
       },
+      removeItem : function(root, item) {
+        if (!root.getChildren || root == item) {
+          return;
+        }
+        var children = root.getChildren();
+        for (var i=0; i < children.length; i++) {
+          if (children.getItem(i) == item) {
+            children.remove(item);
+            return;
+          }
+          this.removeItem(children.getItem(i), item);
+        }
+      },
+    
       removeFile : function (evt) {
         var node = this.getSelectedTreeNode();
         var self = this;
         if (node) {
           var pt = node.getPath();
           self._workspace.rm(pt, function (cb) {
-            console.log("element deleted",cb);
+            self.removeItem(self.model, node);
           });
         }            
       },
@@ -208,7 +222,7 @@ qx.Class.define("carpo.FileBrowser", {
             this._application.createModalTextInputDialog("Create Folder", "Create a new folder in '"+pt+"'", function (filename) {
               var path = pt+"/"+filename;
               self._workspace.createdir(path, function (cb) {
-                console.log("file created",cb);
+                 self.loadContent(pt, node, null);
               });
             });
           }
@@ -224,7 +238,7 @@ qx.Class.define("carpo.FileBrowser", {
             this._application.createModalTextInputDialog("Create File", "Create a new file in '"+pt+"'", function (filename) {
               var path = pt+"/"+filename;
               self._workspace.createfile(path, function (cb) {
-                console.log("file created",cb);
+                self.loadContent(pt, node, null);
               });
             });
           }

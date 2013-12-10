@@ -370,6 +370,19 @@ qx.Class.define("carpo.Application",
       });
       box.add(btn4);
       dlg.center();
+      dlg.addListener ("appear", function (e) {
+        input.focus ();        
+      });
+      dlg.addListener("keypress", function (e) {
+        if(e.getKeyIdentifier() == "Enter") {
+          input.blur();
+          btn3.execute();
+        } else if (e.getKeyIdentifier() == "Escape") {
+          btn4.execute();
+        }
+        
+      }, this);
+
       dlg.show();
     },
     
