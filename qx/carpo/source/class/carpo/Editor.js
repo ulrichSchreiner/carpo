@@ -27,6 +27,10 @@ qx.Class.define("carpo.Editor",
     },
     
     members: {
+        focus : function () {
+          if (this.__ace)
+            this.__ace.focus();
+        },
         jumpTo : function (row, col) {
           if (this.__ace) {
             var pos = {row:row-1,col:col};

@@ -9,6 +9,10 @@ import (
 	"strings"
 )
 
+/*
+A build returns an array of BuildResults. Every BuildResult has information about
+the the source where the problem occured, the line, the column and at least a message
+*/
 type BuildResult struct {
 	Original          string `json:"original"`
 	File              string `json:"file"`
@@ -19,6 +23,14 @@ type BuildResult struct {
 	Message           string `json:"message"`
 	PackageName       string `json:"packagename"`
 	PackageImportPath string `json:"packageimportpath"`
+}
+
+type GoPackage struct {
+	ShortName string
+	LongName  string
+}
+
+type GoStruct struct {
 }
 
 type GoWorkspace struct {

@@ -176,6 +176,11 @@ qx.Class.define("carpo.FileBrowser", {
       loadContent : function (path, parnode, cb) {
         parnode.getChildren().removeAll();
         this._workspace.dir(path, function (data) {
+          data.entries.sort(function (a,b) {
+            if (a.dir && !b.dir) return -1;
+            if (!a.dir && b.dir) return 1;
+            var ta=a.name.toLowerCase(); tb=b.name.toLowerCase(); return ta===tb?0:(ta<tb?-1:1);
+          })
           data.entries.forEach (function (e) {
             if (e.dir) {
               parnode.getChildren().push(qx.data.marshal.Json.createModel({ dir:true, label:e.name, path:path+e.name+"/",children:[]}, true));

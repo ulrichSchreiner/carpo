@@ -91,6 +91,7 @@ qx.Class.define("carpo.EditorsPane",
           if (this.__silent) return;
           qx.event.Timer.once(function() {
             this.fireDataEvent("fileSelected",{name:editor.getFilename(),path:editor.getFilepath()});
+            editor.focus();
           }, this, 50);
         }
       }, this);
