@@ -56,11 +56,12 @@ qx.Class.define("carpo.Application",
         var app = this;
         this.createCommands ();
         var container = new qx.ui.container.Composite(new qx.ui.layout.VBox(2)).set({
-            decorator: "main",
+            decorator: null,
             allowGrowY: true,
             allowGrowX: true
         });
         container.add(this.getMenuBar(),{flex:0});
+        container.add(this.getToolbar(),{flex:0});
       
         var pane = new qx.ui.splitpane.Pane("horizontal").set({
             allowGrowY: true,
@@ -121,6 +122,7 @@ qx.Class.define("carpo.Application",
         pane.add(fb, 1);
         pane2.add(this.editors,4);
         pane2.add(this.compileroutput, 1);
+        pane2.setDecorator(null);
         pane.add(pane2,4);
         container.add(pane, {flex:1});
         this.getRoot().add(container, {width:"100%", height:"100%"});
@@ -205,10 +207,37 @@ qx.Class.define("carpo.Application",
         this._buildCommand = new qx.ui.core.Command("Ctrl-B");
         this._buildCommand.addListener("execute", this.build, this);
     },
-        
+    getToolbar : function () {
+      var toolbar = new qx.ui.toolbar.ToolBar();
+      toolbar.setSpacing(0);
+      toolbar.setDecorator("main");
+      this.runconfigs = new qx.ui.form.ComboBox();
+      this.runconfigs.addListener ("changeValue",this.runconfigChanged, this);
+      toolbar.add (this.runconfigs, {flex:0});
+      
+      var menu = new qx.ui.menu.Menu();
+
+      var newConfig = new qx.ui.menu.Button("Run Configurations ...");
+      newConfig.addListener("execute", function(e) {
+        var runconfigs = new carpo.RunConfiguration(this.getConfig());
+        runconfigs.center();
+        runconfigs.show();        
+      }, this);
+      menu.add(newConfig);
+      
+      this.runButton = new qx.ui.form.SplitButton(null,"icon/16/actions/go-next.png", menu);
+      toolbar.add(this.runButton);
+      this.runButton.addListener ("execute", function (e) {
+      }, this);
+      return toolbar;
+    },
+    
+    runconfigChanged : function (e) {
+    
+    },
     getMenuBar : function() {
         var frame = new qx.ui.container.Composite(new qx.ui.layout.Grow());
-        frame.setDecorator ("main");
+        frame.setDecorator (null);
         var menubar = new qx.ui.menubar.MenuBar();
         frame.add(menubar);
         
