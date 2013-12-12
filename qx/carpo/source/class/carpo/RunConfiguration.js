@@ -12,7 +12,8 @@ qx.Class.define("carpo.RunConfiguration", {
       this.settings = settings;
       this.setLayout(new qx.ui.layout.VBox(0));
       var container = new qx.ui.container.Composite(new qx.ui.layout.Dock()).set({
-        decorator: "main",
+        decorator: null,
+        padding: 4,
         allowGrowY : true,
         allowGrowX : true
       });
@@ -25,7 +26,6 @@ qx.Class.define("carpo.RunConfiguration", {
       var addButton = new qx.ui.form.Button(null,"icon/16/actions/list-add.png");
       toolbar.add(addButton);
       addButton.addListener ("click", function (e) {
-        console.log("add clicked");
         this.data.push(this.newConfig(this.data.getLength()));
       }, this);
       var removeButton = new qx.ui.form.Button(null,"icon/16/actions/list-remove.png");
@@ -33,48 +33,94 @@ qx.Class.define("carpo.RunConfiguration", {
       removeButton.addListener ("click", function (e) {
         var m = this.configList.getSelection()[0].getModel();
         this.data.remove(m);
-        //console.log("remove clicked");
       }, this);
       var left = new qx.ui.container.Composite(new qx.ui.layout.VBox(2));
       left.setAllowGrowX(true);
       left.setAllowGrowY(true);
       left.add (toolbar);
       left.add(this.configList, {flex:1});
-      container.add(left, {edge:"west"});
 
       var cent = new qx.ui.container.Composite(new qx.ui.layout.VBox(2));
       cent.setPadding(5);
       cent.setDecorator("main");
       cent.add(new qx.ui.basic.Label("Name"));
       this.txtName = new qx.ui.form.TextField("");
+      this.txtName.addListener ("input", this.valueChanged("name"), this);
       cent.add(this.txtName);
       cent.add(new qx.ui.basic.Label("Executable"));
       this.txtExecutable = new qx.ui.form.TextField("");
       this.txtExecutable.setMinWidth(350);
+      this.txtExecutable.addListener ("input", this.valueChanged("executable"), this);
       cent.add(this.txtExecutable);
       cent.add(new qx.ui.basic.Label("Parameter"));
       this.txtParams = new qx.ui.form.TextField("");
+      this.txtParams.addListener ("input", this.valueChanged("params"), this);
       cent.add(this.txtParams);
-      cent.add(new qx.ui.basic.Label("Environment (<key>=<val> per Line)"))
+      cent.add(new qx.ui.basic.Label("Environment (<key>=<val> per Line)"));
       this.txtEnvironment = new qx.ui.form.TextArea("");
+      this.txtEnvironment.addListener ("input", this.valueChanged("environment"), this);
       cent.add(this.txtEnvironment);
-      container.add(cent, {edge:"center"});
-      this.add(container,{flex:1});
-      var data = [];
-      this.data = new qx.data.Array(data);
+
+      var data = new qx.data.Array();
+      settings.runconfig.configs.forEach(function (c) {
+        data.push (qx.data.marshal.Json.createModel(c));
+      });
+      this.data = data;
       this.controller = new qx.data.controller.List (this.data, this.configList, "name");
       this.controller.bind("selection[0].name", this.txtName, "value");
-      //this.txtName.bind("value", this.controller, "selection[0].name");
       this.controller.bind("selection[0].executable", this.txtExecutable, "value");
       this.controller.bind("selection[0].params", this.txtParams, "value");
       this.controller.bind("selection[0].environment", this.txtEnvironment, "value");
+      
+      var box = new qx.ui.container.Composite();
+      box.setPaddingTop(4);
+      box.setLayout(new qx.ui.layout.HBox(10, "right"));
+
+      var btn3 = new qx.ui.form.Button("Ok", "icon/16/actions/dialog-ok.png");
+      btn3.addListener("execute", function(e) {
+        this.fireDataEvent("ok",qx.util.Serializer.toNativeObject(this.data));
+        this.close();
+      }, this);
+      box.add(btn3);
+
+      var btn4 = new qx.ui.form.Button("Cancel", "icon/16/actions/dialog-cancel.png");
+      btn4.addListener("execute", function(e) {
+        this.close();
+      }, this);
+      box.add(btn4);
+      this.addListener("keypress", function (e) {
+        if(e.getKeyIdentifier() == "Enter") {
+          btn3.focus();
+          btn3.execute();
+        } else if (e.getKeyIdentifier() == "Escape") {
+          btn4.execute();
+        }
+        
+      }, this);
+      
+      container.add(box,{edge:"south"});
+      container.add(left, {edge:"west"});
+      container.add(cent, {edge:"center"});
+      this.add(container,{flex:1});
+      this.setModal(true);
     },
     members : {
+      valueChanged : function (target) {
+        var self = this;
+        return function (e) {
+          var m = self.configList.getSelection()[0].getModel();
+          var newval = e.getData();
+          m.set(target,newval);
+        }
+      },
+      configmodel : function (c) {
+        return qx.data.marshal.Json.createModel(c);
+      },
       newConfig : function (num) {
         return qx.data.marshal.Json.createModel({
           id : "config-"+num,
           name :"New Configuration",
-          executable:"${workspace}/bin/yourprogramm",
+          executable:"${workspace}/bin/yourprogram",
           params : "",
           environment : "ENV1=val1"
         });

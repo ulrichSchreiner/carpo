@@ -119,9 +119,20 @@ qx.Class.define("carpo.Application",
           fb.selectNode(path);
         }, this);
 
+        var output = new qx.ui.tabview.TabView();
+        output.setContentPadding(0,0,0,0);
+        var problems = new qx.ui.tabview.Page("Problems");
+        problems.setLayout(new qx.ui.layout.HBox(0));
+        output.add(problems);
+        problems.add(this.compileroutput,{flex:1});
+        var runoutput = new qx.ui.tabview.Page("Run/Debug Console");
+        runoutput.setLayout(new qx.ui.layout.HBox(0));
+        runoutput.add (new qx.ui.form.TextArea(""),{flex:1});
+        output.add(runoutput);
+        
         pane.add(fb, 1);
         pane2.add(this.editors,4);
-        pane2.add(this.compileroutput, 1);
+        pane2.add(output, 1);
         pane2.setDecorator(null);
         pane.add(pane2,4);
         container.add(pane, {flex:1});
@@ -129,9 +140,11 @@ qx.Class.define("carpo.Application",
         
         this._configuration = {};
         this.refreshConfig(function (config) {
-            if (config.settings && config.settings.editor)
-                app.editors.configChanged(config.settings.editor);
-            app.build();
+          app.updaterunconfigsInToolbar(config);
+
+          if (config.settings && config.settings.editor)
+            app.editors.configChanged(config.settings.editor);
+          app.build();
         });
     },
 
@@ -163,7 +176,11 @@ qx.Class.define("carpo.Application",
             config.browser = {};
             config.browser.filterpatterns = ["^\\..*","pkg|bin|^\\..*"];
             config.browser.currentfilter = config.browser.filterpatterns[1];
-        }        
+        }
+        if (!config.runconfig) {
+          config.runconfig = {};
+          config.runconfig.configs = [];
+        }
     },
     setConfigValue : function (key, val) {
       this._setConfigValue (key, val);
@@ -210,16 +227,19 @@ qx.Class.define("carpo.Application",
     getToolbar : function () {
       var toolbar = new qx.ui.toolbar.ToolBar();
       toolbar.setSpacing(0);
-      toolbar.setDecorator("main");
-      this.runconfigs = new qx.ui.form.ComboBox();
-      this.runconfigs.addListener ("changeValue",this.runconfigChanged, this);
+      toolbar.setDecorator(null);
+      toolbar.setPaddingLeft(10);
+      this.runconfigs = new qx.ui.form.SelectBox();
+      this.runconfigs.addListener ("changeSelection",this.runconfigChanged, this);
       toolbar.add (this.runconfigs, {flex:0});
-      
+      this.runconfigdata = new qx.data.Array();
       var menu = new qx.ui.menu.Menu();
 
+      new qx.data.controller.List (this.runconfigdata, this.runconfigs, "name");
       var newConfig = new qx.ui.menu.Button("Run Configurations ...");
       newConfig.addListener("execute", function(e) {
         var runconfigs = new carpo.RunConfiguration(this.getConfig());
+        runconfigs.addListener("ok", this.runconfigsChanged, this);
         runconfigs.center();
         runconfigs.show();        
       }, this);
@@ -233,8 +253,39 @@ qx.Class.define("carpo.Application",
     },
     
     runconfigChanged : function (e) {
-    
+      var config =this.getConfig();
+      if (config && config.runconfig) {
+        var sel = this.runconfigs.getSelection()[0];
+        if (sel) sel = sel.getModel();
+        if (sel) {
+          this.getConfig().runconfig.current = sel.getId();
+          this.saveConfig();
+        }
+      }
     },
+    runconfigsChanged : function (e) {
+      var runconfigs = e.getData();
+      var config = this.getConfig();
+      config.runconfig.configs = runconfigs;
+      this.saveConfig();
+      this.updaterunconfigsInToolbar(config);
+    },
+    
+    updaterunconfigsInToolbar : function (config) {
+      var app = this;
+      var current = null;
+      var id = config.runconfig.current;
+      app.runconfigdata.removeAll();
+      config.runconfig.configs.forEach(function (c) {
+        var d = qx.data.marshal.Json.createModel(c);
+        if (id == c.id)
+          current = d;
+        app.runconfigdata.push (d);
+      });      
+      if (current)
+        this.runconfigs.setModelSelection([current]);
+    },
+    
     getMenuBar : function() {
         var frame = new qx.ui.container.Composite(new qx.ui.layout.Grow());
         frame.setDecorator (null);
@@ -415,7 +466,28 @@ qx.Class.define("carpo.Application",
 
       dlg.show();
     },
-    
+    launchProcess : function (launchid) {
+      var service = {};
+      var h = window.location.hostname;
+      var p = window.location.port;
+      var prot = window.location.protocol=="http:" ? "ws://" : "wss://";
+  
+      service.connect = function() {
+        if(service.ws) { return; }
+        var ws = new WebSocket(prot+h+":"+p+"/launch/"+launchid);
+        
+        ws.onopen = function(e) {
+        };
+  
+        ws.onerror = function(e) {
+        }
+  
+        ws.onmessage = function(e) {
+        };
+  
+        service.ws = ws;
+      }      
+    },
     debugButton : function (event) {
         this.debug("Execute button: " + this.getLabel());
     }

@@ -420,6 +420,7 @@ func NewWorkspace(path string) error {
 	w.register(wsContainer)
 
 	http.Handle("/workspace/", logged(wsContainer))
+	http.Handle("/launch/", logged(websocket.Handler(launchProcessHandler(&w))))
 	//http.Handle("/wsworkspace", logged(websocket.Handler(workspaceHandler(&w))))
 	return nil
 }
@@ -448,6 +449,10 @@ func transformEvent(ws *workspace, evt *fsnotify.FileEvent) (*fileevent, error) 
 		}
 	}
 	return &fe, nil
+}
+func launchProcessHandler(ws *workspace) websocket.Handler {
+	return func(ws *websocket.Conn) {
+	}
 }
 func workspaceHandler(works *workspace) websocket.Handler {
 	return func(ws *websocket.Conn) {
