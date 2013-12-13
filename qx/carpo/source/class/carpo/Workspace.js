@@ -21,6 +21,10 @@ qx.Class.define("carpo.Workspace",
       }, this);
       return d;
     },
+    killproc : function (pid, cb) {
+      var d = this.__getresource("kill","GET","/workspace/process/{pid}/kill", cb);
+      d.kill({pid:pid});
+    },
     dir : function (pt, cb) {
       var d = this.__getresource("dir","GET","/workspace/dir", cb);
       d.dir({},"path="+pt);

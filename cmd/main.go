@@ -17,6 +17,7 @@ import (
 var port = flag.Int("port", 8787, "the port to use for carpo")
 var clientpath = flag.String("clientpath", "", "the path to the client resource directory (should contain an index.html file)")
 var wks = flag.String("workspace", "", "the path to the workspace")
+var browser = flag.Bool("browser", false, "start a browser with the server URL")
 
 func main() {
 	flag.Parse()
@@ -43,7 +44,9 @@ func main() {
 	}
 
 	fmt.Printf("carpo started at port %d...\n", *port)
-	startBrowser(fmt.Sprintf("http://localhost:%d", *port))
+	if *browser {
+		startBrowser(fmt.Sprintf("http://localhost:%d", *port))
+	}
 	http.Serve(l, nil)
 }
 

@@ -52,7 +52,7 @@ qx.Class.define("carpo.RunConfiguration", {
       this.txtExecutable.setMinWidth(350);
       this.txtExecutable.addListener ("input", this.valueChanged("executable"), this);
       cent.add(this.txtExecutable);
-      cent.add(new qx.ui.basic.Label("Parameter"));
+      cent.add(new qx.ui.basic.Label("Parameter (optionally surrounded  by \")"));
       this.txtParams = new qx.ui.form.TextField("");
       this.txtParams.addListener ("input", this.valueChanged("params"), this);
       cent.add(this.txtParams);
@@ -62,9 +62,10 @@ qx.Class.define("carpo.RunConfiguration", {
       cent.add(this.txtEnvironment);
 
       var data = new qx.data.Array();
-      settings.runconfig.configs.forEach(function (c) {
-        data.push (qx.data.marshal.Json.createModel(c));
-      });
+      for (var c in settings.runconfig.configs) {
+        var val = settings.runconfig.configs[c];
+        data.push(qx.data.marshal.Json.createModel(val));
+      }
       this.data = data;
       this.controller = new qx.data.controller.List (this.data, this.configList, "name");
       this.controller.bind("selection[0].name", this.txtName, "value");
@@ -78,7 +79,12 @@ qx.Class.define("carpo.RunConfiguration", {
 
       var btn3 = new qx.ui.form.Button("Ok", "icon/16/actions/dialog-ok.png");
       btn3.addListener("execute", function(e) {
-        this.fireDataEvent("ok",qx.util.Serializer.toNativeObject(this.data));
+        var res = {};
+        var reslist = qx.util.Serializer.toNativeObject(this.data);
+        reslist.forEach(function (d) {
+          res[d.id] = d;
+        });
+        this.fireDataEvent("ok",res);
         this.close();
       }, this);
       box.add(btn3);
@@ -120,7 +126,7 @@ qx.Class.define("carpo.RunConfiguration", {
         return qx.data.marshal.Json.createModel({
           id : "config-"+num,
           name :"New Configuration",
-          executable:"${workspace}/bin/yourprogram",
+          executable:"{{.Workspace}}/bin/yourprogram",
           params : "",
           environment : "ENV1=val1"
         });

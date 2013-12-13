@@ -9,13 +9,16 @@ import (
 	_ "github.com/ulrichSchreiner/carpo/golang"
 	"github.com/ulrichSchreiner/carpo/workspace/builder"
 	"go/format"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 )
 
 type buildType string
@@ -45,6 +48,7 @@ func (w *workspace) register(container *restful.Container) {
 	ws.Route(ws.POST("/config").To(w.saveConfig))
 	ws.Route(ws.GET("/config").To(w.loadConfig))
 	ws.Route(ws.POST("/build").To(w.buildWorkspace).Reads(buildRequest{}).Writes(buildResponse{}))
+	ws.Route(ws.GET("/process/{pid}/kill").To(w.killproc))
 	container.Add(&ws)
 }
 
@@ -356,6 +360,36 @@ func (serv *workspace) gobinpath() *string {
 	return serv.gotool
 }
 
+func (serv *workspace) killproc(request *restful.Request, response *restful.Response) {
+	spid := request.PathParameter("pid")
+	pid, err := strconv.ParseInt(spid, 10, 0)
+	if err == nil {
+		serv.killProcess(int(pid))
+	}
+}
+func (serv *workspace) putProcess(p *os.Process) int {
+	serv.proclock.Lock()
+	defer serv.proclock.Unlock()
+	serv.processes[p.Pid] = p
+	return p.Pid
+}
+
+func (serv *workspace) removeProcess(p *os.Process) {
+	serv.proclock.Lock()
+	defer serv.proclock.Unlock()
+	delete(serv.processes, p.Pid)
+}
+func (serv *workspace) killProcess(pid int) {
+	serv.proclock.Lock()
+	defer serv.proclock.Unlock()
+	// only kill, if the pid is in our process-map!
+	p, ok := serv.processes[pid]
+	if ok {
+		p.Kill()
+		delete(serv.processes, p.Pid)
+	}
+}
+
 func sendError(response *restful.Response, status int, err error) {
 	response.WriteHeader(status)
 	response.WriteEntity(restful.NewError(status, fmt.Sprintf("%s", err)))
@@ -368,6 +402,9 @@ type workspace struct {
 	goapptool   *string
 	goworkspace *builder.GoWorkspace
 	config      map[string]interface{}
+
+	processes map[int]*os.Process
+	proclock  *sync.Mutex
 }
 
 type fileevent struct {
@@ -395,8 +432,10 @@ func NewWorkspace(path string) error {
 
 		path = filepath.Join(workdir, path)
 	}
-	w := workspace{path, nil, nil, nil, nil, nil}
+	w := workspace{path, nil, nil, nil, nil, nil, nil, new(sync.Mutex)}
 	w.loadConfiguration()
+	w.processes = make(map[int]*os.Process)
+
 	gopath, err := exec.LookPath("go")
 	if err != nil {
 		log.Printf("no go tool found in path: %s\n", err)
@@ -450,8 +489,52 @@ func transformEvent(ws *workspace, evt *fsnotify.FileEvent) (*fileevent, error) 
 	}
 	return &fe, nil
 }
-func launchProcessHandler(ws *workspace) websocket.Handler {
+func launchProcessHandler(wks *workspace) websocket.Handler {
 	return func(ws *websocket.Conn) {
+		location := ws.Config().Location.Path
+		parts := strings.Split(location, "/")
+		launchid := parts[len(parts)-1]
+		lc, err := wks.getLaunchConfig(launchid)
+		if err != nil {
+			log.Printf("Error in launchProcessHandler: %v", err)
+		} else {
+			cmd := wks.launch(lc)
+			stdout, err := cmd.StdoutPipe()
+			if err != nil {
+				log.Printf("Error no StdoutPipe: %s", err)
+				return
+			}
+			stderr, err := cmd.StderrPipe()
+			if err != nil {
+				log.Printf("Error no StderrPipe: %s", err)
+				return
+			}
+			stdin, err := cmd.StdinPipe()
+			if err != nil {
+				log.Printf("Error no StdinPipe: %s", err)
+				return
+			}
+			if err := cmd.Start(); err != nil {
+				log.Printf("Error when starting process: %s", err)
+				return
+			}
+			wks.putProcess(cmd.Process)
+			io.WriteString(ws, fmt.Sprintf("%d\n", cmd.Process.Pid))
+			go func() {
+				io.Copy(ws, stdout)
+			}()
+			go func() {
+				io.Copy(ws, stderr)
+			}()
+			go func() {
+				io.Copy(stdin, ws)
+			}()
+			if err := cmd.Wait(); err != nil {
+				log.Printf("Error waiting for process: %s", err)
+			}
+			wks.removeProcess(cmd.Process)
+			log.Printf("LC '%+v' ended", lc)
+		}
 	}
 }
 func workspaceHandler(works *workspace) websocket.Handler {

@@ -126,8 +126,16 @@ qx.Class.define("carpo.Application",
         output.add(problems);
         problems.add(this.compileroutput,{flex:1});
         var runoutput = new qx.ui.tabview.Page("Run/Debug Console");
-        runoutput.setLayout(new qx.ui.layout.HBox(0));
-        runoutput.add (new qx.ui.form.TextArea(""),{flex:1});
+        runoutput.setLayout(new qx.ui.layout.VBox(0));
+        this.txtRunoutput = new qx.ui.form.TextArea("");
+        this.txtRunoutput.setReadOnly(true);
+        this.txtRunoutput.addListener ("changeValue", function (e) {          
+          var el = this.txtRunoutput.getContentElement().getDomElement();
+          if (el)
+            el.scrollTop = el.scrollHeight;
+        }, this);
+        runoutput.add (this.getRunningToolbar(this.txtRunoutput),{flex:0});
+        runoutput.add (this.txtRunoutput,{flex:1});
         output.add(runoutput);
         
         pane.add(fb, 1);
@@ -179,7 +187,7 @@ qx.Class.define("carpo.Application",
         }
         if (!config.runconfig) {
           config.runconfig = {};
-          config.runconfig.configs = [];
+          config.runconfig.configs = {};
         }
     },
     setConfigValue : function (key, val) {
@@ -224,6 +232,38 @@ qx.Class.define("carpo.Application",
         this._buildCommand = new qx.ui.core.Command("Ctrl-B");
         this._buildCommand.addListener("execute", this.build, this);
     },
+    getRunningToolbar : function (output) {
+      var toolbar = new qx.ui.toolbar.ToolBar();
+      toolbar.setSpacing(0);
+      toolbar.setDecorator(null);
+      toolbar.setPaddingLeft(10);
+      this.processes = new qx.data.Array();
+      var processes = new qx.ui.form.SelectBox();
+      var ctrl = new qx.data.controller.List(this.processes, processes, "name");
+      //processes.addListener ("changeSelection",this.processChanged, this);
+      toolbar.add (processes, {flex:0});
+      var stopButton = new qx.ui.form.Button(null,"icon/16/actions/process-stop.png");
+      this.processes.bind("length", stopButton, "enabled", {
+        converter : function (l) {
+          return l>0;
+        }
+      });
+      ctrl.bind("selection[0].output", output, "value");
+      stopButton.addListener ("execute", function (e) {
+        var sel = processes.getSelection()[0];
+        if (sel) sel = sel.getModel();
+        if (sel) {
+          if (sel.getPid() !== "")
+            this.workspace.killproc(sel.getPid());
+          else
+            this.processes.remove(sel);
+        }        
+      }, this);
+      toolbar.add(stopButton);
+      stopButton.setEnabled(false);
+      return toolbar;
+    },
+    
     getToolbar : function () {
       var toolbar = new qx.ui.toolbar.ToolBar();
       toolbar.setSpacing(0);
@@ -248,6 +288,10 @@ qx.Class.define("carpo.Application",
       this.runButton = new qx.ui.form.SplitButton(null,"icon/16/actions/go-next.png", menu);
       toolbar.add(this.runButton);
       this.runButton.addListener ("execute", function (e) {
+        var conf = this.getConfig();
+        var lc = conf.runconfig.configs[conf.runconfig.current];
+        var proc = this.launchProcess(lc);
+        proc.connect();
       }, this);
       return toolbar;
     },
@@ -276,12 +320,13 @@ qx.Class.define("carpo.Application",
       var current = null;
       var id = config.runconfig.current;
       app.runconfigdata.removeAll();
-      config.runconfig.configs.forEach(function (c) {
-        var d = qx.data.marshal.Json.createModel(c);
-        if (id == c.id)
+      for (var c in config.runconfig.configs) {
+        var conf = config.runconfig.configs[c];
+        var d = qx.data.marshal.Json.createModel(conf);
+        if (id == conf.id)
           current = d;
-        app.runconfigdata.push (d);
-      });      
+        app.runconfigdata.push(d);
+      }
       if (current)
         this.runconfigs.setModelSelection([current]);
     },
@@ -466,27 +511,58 @@ qx.Class.define("carpo.Application",
 
       dlg.show();
     },
-    launchProcess : function (launchid) {
+    launchProcess : function (launch) {
+      console.log("start launch", launch);
       var service = {};
+      service.launchconfig = launch;
+      service.pid = null;
+      service.output = "";
+      service.name = launch.name;
+      
+      var model = qx.data.marshal.Json.createModel(service);
+      
       var h = window.location.hostname;
       var p = window.location.port;
       var prot = window.location.protocol=="http:" ? "ws://" : "wss://";
-  
+      var self = this;
       service.connect = function() {
+        var pid = "";
         if(service.ws) { return; }
-        var ws = new WebSocket(prot+h+":"+p+"/launch/"+launchid);
+        var ws = new WebSocket(prot+h+":"+p+"/launch/"+launch.id);
         
         ws.onopen = function(e) {
+          //console.log("on open");
         };
   
         ws.onerror = function(e) {
-        }
+          console.log("on error");
+        };
+        
+        ws.onclose = function (e) {
+          model.setPid("");    
+          model.setName(launch.name+" [STOPPED]");
+        };
   
         ws.onmessage = function(e) {
+          var data = e.data;
+          if (!model.getPid()) {
+            pid = pid + data;
+            if (pid[pid.length-1] == "\n") {
+              model.setPid(pid.trim());    
+              model.setName(launch.name+" ["+model.getPid()+"]");
+            }
+          } else {
+            model.setOutput(model.getOutput()+e.data);
+            //self.txtRunoutput.setValue(self.txtRunoutput.getValue()+e.data);
+          }
         };
   
         service.ws = ws;
-      }      
+      };
+      this.processes.push(model);
+      console.log("launch",model);
+      return service;
+      
     },
     debugButton : function (event) {
         this.debug("Execute button: " + this.getLabel());

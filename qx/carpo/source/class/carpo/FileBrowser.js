@@ -179,7 +179,9 @@ qx.Class.define("carpo.FileBrowser", {
           data.entries.sort(function (a,b) {
             if (a.dir && !b.dir) return -1;
             if (!a.dir && b.dir) return 1;
-            var ta=a.name.toLowerCase(); tb=b.name.toLowerCase(); return ta===tb?0:(ta<tb?-1:1);
+            var ta=a.name.toLowerCase(); 
+            var tb=b.name.toLowerCase(); 
+            return ta===tb?0:(ta<tb?-1:1);
           })
           data.entries.forEach (function (e) {
             if (e.dir) {
