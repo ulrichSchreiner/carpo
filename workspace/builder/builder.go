@@ -113,7 +113,7 @@ type srcDir struct {
 }
 
 func (src *srcDir) walker(path string, info os.FileInfo, err error) error {
-	if !info.IsDir() {
+	if info != nil && !info.IsDir() {
 		if bytes.Compare([]byte(strings.ToLower(filepath.Ext(info.Name()))), go_file_postfix) == 0 {
 			// we have a go file :-)
 			//TODO: check if this directory was already imported
@@ -212,6 +212,7 @@ func (ws *GoWorkspace) parseBuildOutput(base string, output string) []BuildResul
 			var br BuildResult
 			br.Original = l
 			br.Source = string(m[1])
+			br.Type = BUILD_ERROR
 			// we always work in a subdirectory named ".carpowork", so strip the ".." from the filepath
 			br.File = br.Source[2:]
 			br.Directory = filepath.Dir(br.File)

@@ -176,6 +176,16 @@ qx.Class.define("carpo.EditorsPane",
         getEditorFor : function (path) {
             return this._openeditors[path];
         },
+        getDirtyPaths : function () {
+          var result = [];
+          for (var p in this._openeditors) {
+            var ed = this._openeditors[p];
+            if (ed.getDirty()) {
+              result.push(p);
+            }
+          }
+          return result;
+        },
         showEditor : function (ed) {
           this.__showEditor(ed);
           if (ed != this.getCurrentEditor())

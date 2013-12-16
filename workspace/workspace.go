@@ -49,6 +49,7 @@ func (w *workspace) register(container *restful.Container) {
 	ws.Route(ws.GET("/config").To(w.loadConfig))
 	ws.Route(ws.POST("/build").To(w.buildWorkspace).Reads(buildRequest{}).Writes(buildResponse{}))
 	ws.Route(ws.GET("/process/{pid}/kill").To(w.killproc))
+	ws.Route(ws.GET("/exit").To(w.exitCarpo))
 	container.Add(&ws)
 }
 
@@ -318,8 +319,15 @@ func (serv *workspace) buildWorkspace(request *restful.Request, response *restfu
 		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Build Request: %s", err))
 		return
 	}
+	ignoredPackages := make(map[string]bool)
+	if ignored, ok := serv.config["ignoredPackages"]; ok {
+		for k, _ := range ignored.(map[string]interface{}) {
+			ignoredPackages[k] = true
+		}
+	}
+	log.Printf("ignore packages: %+v", ignoredPackages)
 	result.BuildType = BUILD_GOLANG
-	output, dirs, err := serv.goworkspace.FullBuild(serv.Path)
+	output, dirs, err := serv.goworkspace.FullBuild(serv.Path, ignoredPackages)
 	if err != nil {
 		log.Printf("Build ERROR: %s\n", err)
 		result.Message = err.Error()
@@ -388,6 +396,10 @@ func (serv *workspace) killProcess(pid int) {
 		p.Kill()
 		delete(serv.processes, p.Pid)
 	}
+}
+
+func (serv *workspace) exitCarpo(request *restful.Request, response *restful.Response) {
+	os.Exit(0)
 }
 
 func sendError(response *restful.Response, status int, err error) {

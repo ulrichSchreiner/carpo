@@ -6,6 +6,7 @@ qx.Class.define("carpo.Editor",
         filepath: { init: null },
         filename: { init: null },
         content: { init: null },
+        dirty : { init: false },
         mode: { init: null },
         config: { init: null, nullable:true }
     },
@@ -71,6 +72,7 @@ qx.Class.define("carpo.Editor",
           }
           if (clean) {
             this.setLabel(this.getFilename());
+            this.setDirty(false);
           }
         },
         configChanged : function (config) {
@@ -126,6 +128,7 @@ qx.Class.define("carpo.Editor",
                 session.on('change', function(e) {
                     self.setContent(session.getValue());
                     self.setLabel("*"+self.getFilename());
+                    self.setDirty(true);
                 });
                 // append resize listener
                 this.__editor.addListener("resize", function() {

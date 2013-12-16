@@ -40,6 +40,7 @@ qx.Class.define("carpo.Application",
     main : function() {
         // Call super class
         this.base(arguments);
+        qx.Class.include(qx.ui.table.Table, qx.ui.table.MTableContextMenu);
         
         // Enable logging in debug variant
         if (qx.core.Environment.get("qx.debug")) {
@@ -85,6 +86,7 @@ qx.Class.define("carpo.Application",
                 decorator:null,
                 statusBarVisible:false
                 });
+        this.compileroutput.setContextMenuHandler(0, this.problemContextMenu, this);
         this.compileroutput.addListener("cellDblclick", function (e) {
             var row = e.getRow();
             var data = this.compileroutputModel.getRowData(row);
@@ -137,9 +139,31 @@ qx.Class.define("carpo.Application",
         runoutput.add (this.getRunningToolbar(this.txtRunoutput),{flex:0});
         runoutput.add (this.txtRunoutput,{flex:1});
         output.add(runoutput);
-        
+        var ignoredPackages = new qx.ui.tabview.Page("Ignored Resources");
+        ignoredPackages.setLayout(new qx.ui.layout.HBox(0));
+        this.ignoredPackagesModel = new qx.ui.table.model.Simple();
+        this.ignoredPackagesModel.setColumns([ "Type","Ignored" ]);
+        custom = {
+            tableColumnModel : function(obj) {
+                return new qx.ui.table.columnmodel.Resize(obj);
+            }
+        };      
+        this.ignoredPackagesTable = new qx.ui.table.Table(this.ignoredPackagesModel, custom)
+            .set({
+                allowGrowX:true,
+                allowGrowY:true,
+                decorator:null,
+                statusBarVisible:false
+                });
+        this.ignoredPackagesTable.setContextMenuHandler(0, this.ignoredPackagesContextMenu, this);
+        tcm = this.ignoredPackagesTable.getTableColumnModel();
+        resizeBehavior = tcm.getBehavior();
+        resizeBehavior.setWidth(0, "30%");
+        resizeBehavior.setWidth(1, "70%");
+        ignoredPackages.add(this.ignoredPackagesTable,{flex:1});
+        output.add(ignoredPackages);
         pane.add(fb, 1);
-        pane2.add(this.editors,4);
+        pane2.add(this.editors,2);
         pane2.add(output, 1);
         pane2.setDecorator(null);
         pane.add(pane2,4);
@@ -152,10 +176,46 @@ qx.Class.define("carpo.Application",
 
           if (config.settings && config.settings.editor)
             app.editors.configChanged(config.settings.editor);
+          app.refreshIgnoredResources();
           app.build();
         });
     },
-
+    
+    ignoredPackagesContextMenu : function (col, row, table, dataModel, contextMenu) {
+      var data = dataModel.getValue(1, row);
+      var config = this.getConfig();
+      var me = new qx.ui.menu.Button ("Un-ignore '"+data+"'");
+      me.addListener("execute", function (e) {
+        delete(config.ignoredPackages[data]);
+        this.saveConfig();
+        this.refreshIgnoredResources();        
+      }, this);
+      contextMenu.add(me);
+      return true;      
+    },
+    
+    problemContextMenu : function (col, row, table, dataModel, contextMenu) {
+      var data = dataModel.getValue(9, row);
+      var config = this.getConfig();
+      if (!config.ignoredPackages[data.packageimportpath]) {
+        var me = new qx.ui.menu.Button ("Ignore '"+data.packageimportpath+"' when building");
+        me.addListener("execute", function (e) {
+          config.ignoredPackages[data.packageimportpath] = {};
+          this.saveConfig();
+          this.refreshIgnoredResources();
+        }, this);
+        contextMenu.add(me);
+        return true;      
+      }
+    },
+    refreshIgnoredResources : function () {
+      var d = [];
+      var config = this.getConfig();
+      for (var i in config.ignoredPackages) {
+        d.push(["Package",i]);
+      }
+      this.ignoredPackagesModel.setData(d);      
+    },
     currentSelectedEditorPath : function () {
       if (this.editors.getCurrentEditor())
         return this.editors.getCurrentEditor().getFilepath();
@@ -188,6 +248,9 @@ qx.Class.define("carpo.Application",
         if (!config.runconfig) {
           config.runconfig = {};
           config.runconfig.configs = {};
+        }
+        if (!config.ignoredPackages) {
+          config.ignoredPackages = {};
         }
     },
     setConfigValue : function (key, val) {
@@ -231,6 +294,12 @@ qx.Class.define("carpo.Application",
         this._settingsCommand.addListener("execute", this.showSettings, this);
         this._buildCommand = new qx.ui.core.Command("Ctrl-B");
         this._buildCommand.addListener("execute", this.build, this);
+        this._exitCommand = new qx.ui.core.Command("Ctrl-Q");
+        this._exitCommand.addListener("execute", this.exit, this);
+        this._runCommand = new qx.ui.core.Command("Ctrl-R");
+        this._runCommand.addListener("execute", this.run, this);
+        this._saveAllCommand = new qx.ui.core.Command();
+        this._saveAllCommand.addListener("execute", this.saveAll, this);
     },
     getRunningToolbar : function (output) {
       var toolbar = new qx.ui.toolbar.ToolBar();
@@ -239,6 +308,7 @@ qx.Class.define("carpo.Application",
       toolbar.setPaddingLeft(10);
       this.processes = new qx.data.Array();
       var processes = new qx.ui.form.SelectBox();
+      processes.setMinWidth(250);
       var ctrl = new qx.data.controller.List(this.processes, processes, "name");
       //processes.addListener ("changeSelection",this.processChanged, this);
       toolbar.add (processes, {flex:0});
@@ -287,12 +357,7 @@ qx.Class.define("carpo.Application",
       
       this.runButton = new qx.ui.form.SplitButton(null,"icon/16/actions/go-next.png", menu);
       toolbar.add(this.runButton);
-      this.runButton.addListener ("execute", function (e) {
-        var conf = this.getConfig();
-        var lc = conf.runconfig.configs[conf.runconfig.current];
-        var proc = this.launchProcess(lc);
-        proc.connect();
-      }, this);
+      this.runButton.addListener ("execute", this.run, this);
       return toolbar;
     },
     
@@ -370,9 +435,10 @@ qx.Class.define("carpo.Application",
         //var openButton = new qx.ui.menu.Button("Open", "icon/16/actions/document-open.png", this._openCommand);
         //var closeButton = new qx.ui.menu.Button("Close");
         var saveButton = new qx.ui.menu.Button("Save", "icon/16/actions/document-save.png", this._saveCommand);
+        var saveAllButton = new qx.ui.menu.Button ("Save all", null, this._saveAllCommand);
         //var saveAsButton = new qx.ui.menu.Button("Save as...", "icon/16/actions/document-save-as.png");
         //var printButton = new qx.ui.menu.Button("Print", "icon/16/actions/document-print.png");
-        //var exitButton = new qx.ui.menu.Button("Exit", "icon/16/actions/application-exit.png");
+        var exitButton = new qx.ui.menu.Button("Exit", "icon/16/actions/application-exit.png", this._exitCommand);
         
         //newButton.addListener("execute", this.debugButton);
         //openButton.addListener("execute", this.debugButton);
@@ -386,9 +452,10 @@ qx.Class.define("carpo.Application",
         //menu.add(openButton);
         //menu.add(closeButton);
         menu.add(saveButton);
+        menu.add(saveAllButton);
         //menu.add(saveAsButton);
         //menu.add(printButton);
-        //menu.add(exitButton);
+        menu.add(exitButton);
         
         return menu;
     },
@@ -407,28 +474,63 @@ qx.Class.define("carpo.Application",
             });
         }
     },
-    
-    build : function (evt) {
+    saveAll : function () {
+      var paths = this.editors.getDirtyPaths ();
+      var cb = function (rsp) {
+        this.setEditorValue(rsp.formattedcontent, true);        
+      }
+      for (var i=0; i<paths.length; i++) {
+        var editor = this.editors.getEditorFor(paths[i]);
+        if (editor) {
+          var app = this;
+          var data = editor.getEditorData();
+          data.build = false;
+          this.workspace.saveFile(data.path, data, qx.lang.Function.bind(cb, editor));
+        }
+      }
+    },
+    build : function (evt, cb) {
         var config = this.getConfig();
         var data = {};
         data.build = true;
         var app = this;
         this.workspace.build(data, function (rsp) {
-            app.showBuildResult(rsp);
+            var hasErrors = app.showBuildResult(rsp);
+            if (cb)
+              cb(rsp, hasErrors);
         });
     },
+    exit : function (evt) {
+      this.workspace.exit();
+    },
+    run : function (evt) {
+      var self = this;
+      this.build(evt, function (res, hasErrors) {
+        //if (!hasErrors) {
+          var conf = self.getConfig();
+          var lc = conf.runconfig.configs[conf.runconfig.current];
+          var proc = self.launchProcess(lc);
+          proc.connect(); 
+        //}
+      });
+    },
+    
     showBuildResult : function (result) {
         var data = [];
+        var hasError = false;
         if (result && result.buildoutput) {
           this.currentBuildoutput = result.buildoutput;
           result.buildoutput.forEach(function (o) {
-             data.push([o.file,o.line,o.column, o.message]); 
+            if (o.type === "error")
+              hasError = true;
+            data.push([o.file,o.line,o.column, o.message,null,null,null,null,null,o]); 
           });
         } else {
           this.currentBuildoutput = null;
         }
         this.showAnnotations();
         this.compileroutputModel.setData(data);
+        return hasError;
     },
     showAnnotations : function () {
       this.editors.showAnnotations(this.currentBuildoutput || []);

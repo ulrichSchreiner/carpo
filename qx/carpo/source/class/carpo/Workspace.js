@@ -65,6 +65,11 @@ qx.Class.define("carpo.Workspace",
     rm : function (pt, cb) {
       var d = this.__getresource("get","GET","/workspace/rm", cb);
       d.get({},"path="+pt);
+    },
+    exit : function (cb) {
+      var d = this.__getresource("get","GET","/workspace/exit", cb);
+      d.get();
     }
+    
   }
 });

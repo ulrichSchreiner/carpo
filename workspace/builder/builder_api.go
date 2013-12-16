@@ -9,20 +9,27 @@ import (
 	"strings"
 )
 
+type BuildResultType string
+
+const (
+	BUILD_ERROR BuildResultType = "error"
+)
+
 /*
 A build returns an array of BuildResults. Every BuildResult has information about
 the the source where the problem occured, the line, the column and at least a message
 */
 type BuildResult struct {
-	Original          string `json:"original"`
-	File              string `json:"file"`
-	Directory         string `json:"directory"`
-	Source            string `json:"source"`
-	Line              int    `json:"line"`
-	Column            int    `json:"column"`
-	Message           string `json:"message"`
-	PackageName       string `json:"packagename"`
-	PackageImportPath string `json:"packageimportpath"`
+	Type              BuildResultType `json:"type"`
+	Original          string          `json:"original"`
+	File              string          `json:"file"`
+	Directory         string          `json:"directory"`
+	Source            string          `json:"source"`
+	Line              int             `json:"line"`
+	Column            int             `json:"column"`
+	Message           string          `json:"message"`
+	PackageName       string          `json:"packagename"`
+	PackageImportPath string          `json:"packageimportpath"`
 }
 
 type GoPackage struct {
@@ -131,12 +138,14 @@ func (ws *GoWorkspace) BuildPackage(base string, packdir string) (*[]BuildResult
 	return &ws.Build, &dirs, nil
 }
 
-func (ws *GoWorkspace) FullBuild(base string) (*[]BuildResult, *[]string, error) {
+func (ws *GoWorkspace) FullBuild(base string, ignoredPackages map[string]bool) (*[]BuildResult, *[]string, error) {
 	args := []string{}
 	dirs := []string{}
 	for p, _ := range ws.Packages {
-		args = append(args, p)
-		dirs = append(dirs, ws.findDirectoryFromPackage(p))
+		if _, ok := ignoredPackages[p]; !ok {
+			args = append(args, p)
+			dirs = append(dirs, ws.findDirectoryFromPackage(p))
+		}
 	}
 	res, err := ws.build(args...)
 	if err != nil {
