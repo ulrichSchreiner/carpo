@@ -309,6 +309,7 @@ qx.Class.define("carpo.Application",
       this.processes = new qx.data.Array();
       var processes = new qx.ui.form.SelectBox();
       processes.setMinWidth(250);
+      this.processList = processes;
       var ctrl = new qx.data.controller.List(this.processes, processes, "name");
       //processes.addListener ("changeSelection",this.processChanged, this);
       toolbar.add (processes, {flex:0});
@@ -614,7 +615,6 @@ qx.Class.define("carpo.Application",
       dlg.show();
     },
     launchProcess : function (launch) {
-      console.log("start launch", launch);
       var service = {};
       service.launchconfig = launch;
       service.pid = null;
@@ -662,7 +662,7 @@ qx.Class.define("carpo.Application",
         service.ws = ws;
       };
       this.processes.push(model);
-      console.log("launch",model);
+      this.processList.setModelSelection([model]);
       return service;
       
     },
