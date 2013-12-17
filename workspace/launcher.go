@@ -86,6 +86,9 @@ func parseParameters(params string) (res []string) {
 	fields := strings.Fields(params)
 	param := ""
 	for _, f := range fields {
+		if f[0] == '"' && f[len(f)-1] == '"' {
+			f = f[1 : len(f)-1]
+		}
 		if f[0] == '"' {
 			param = param + f[1:]
 		} else if f[len(f)-1] == '"' {
