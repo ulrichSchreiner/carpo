@@ -351,14 +351,16 @@ func (serv *workspace) gobinpath() *string {
 			case TYPE_GO:
 				gopath, _ := go_settings[SETTING_GOPATH]
 				if gopath != nil {
-					return gopath.(*string)
+					gp := gopath.(string)
+					return &gp
 				} else {
 					return serv.gotool
 				}
 			case TYPE_APPENGINE:
 				gopath, _ := go_settings[SETTING_GOAPPPATH]
 				if gopath != nil {
-					return gopath.(*string)
+					gp := gopath.(string)
+					return &gp
 				} else {
 					return serv.goapptool
 				}
