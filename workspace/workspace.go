@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"bytes"
 	"code.google.com/p/go.net/websocket"
 	"encoding/json"
 	"fmt"
@@ -285,7 +286,13 @@ func (serv *workspace) saveConfig(request *restful.Request, response *restful.Re
 		sendError(response, http.StatusBadRequest, fmt.Errorf("Error parsing config: %s", err))
 		return
 	}
+	oldgo := serv.gobinpath()
 	serv.config = conf.(map[string]interface{})
+	newgo := serv.gobinpath()
+	if bytes.Compare([]byte(*oldgo), []byte(*newgo)) != 0 {
+		gws := builder.NewGoWorkspace(*newgo, []string{serv.Path})
+		serv.goworkspace = gws
+	}
 	b, err := json.MarshalIndent(conf, "", "  ")
 	if err != nil {
 		sendError(response, http.StatusBadRequest, fmt.Errorf("Error writing config: %s", err))
@@ -466,6 +473,7 @@ func NewWorkspace(path string) error {
 	}
 	gobinpath := w.gobinpath()
 	log.Printf("Workspace uses %s as go", *gobinpath)
+
 	gws := builder.NewGoWorkspace(*gobinpath, []string{path})
 	w.goworkspace = gws
 

@@ -67,9 +67,19 @@ func NewGoWorkspace(gobin string, gopath []string) *GoWorkspace {
 	g.testneededBy = make(map[string][]string)
 	g.testdependencies = make(map[string][]string)
 	g.context = build.Default
-	log.Printf("DEFAULT GOPATH:%+v", g.context)
 	g.context.GOPATH = strings.Join(gopath, string(filepath.ListSeparator))
 	g.GoPath = gopath
+	goroot, err := g.env("GOROOT")
+	if err != nil {
+		log.Printf("no system packages found, cannot detect GOROOT from '%s': %s", gobin, err)
+	} else {
+		srcSystem := new(srcDir)
+		srcSystem.importer = g.importSystemPackage
+		srcSystem.path = filepath.Join(goroot, "src", "pkg")
+		filepath.Walk(srcSystem.path, srcSystem.walker)
+	}
+	g.context.GOROOT = goroot
+	log.Printf("CONTEXT:%+v", g.context)
 	for i, src := range gopath {
 		srcd := new(srcDir)
 		srcd.importer = g.importPackage
@@ -82,15 +92,6 @@ func NewGoWorkspace(gobin string, gopath []string) *GoWorkspace {
 			// ignore error if directory exists
 			os.Mkdir(g.Workdir, 0755)
 		}
-	}
-	goroot, err := g.env("GOROOT")
-	if err != nil {
-		log.Printf("no system packages found, cannot detect GOROOT from '%s': %s", gobin, err)
-	} else {
-		srcSystem := new(srcDir)
-		srcSystem.importer = g.importSystemPackage
-		srcSystem.path = filepath.Join(goroot, "src", "pkg")
-		filepath.Walk(srcSystem.path, srcSystem.walker)
 	}
 
 	g.resolve()
