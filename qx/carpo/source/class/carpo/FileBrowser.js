@@ -50,22 +50,15 @@ qx.Class.define("carpo.FileBrowser", {
       this.tree = new qx.ui.tree.VirtualTree(model, "label", "children");
       
       var self = this;
-      this.tree.setOpenMode("click");
+      this.tree.setOpenMode("dblclick");
       this.tree.setHideRoot(true);
-      this.tree.setDelegate({configureItem:this.configureTreeItem,filter: function(d) {return true;}});
+      this.tree.setDelegate(this.createTreeDelegate(function(d) {return true;}));
       this.tree.addListener ("open", function (e) {
         if (this._refreshLock) return;
         var node = e.getData();
         if (node.getDir())
           this.loadContent(node.getPath(), node);
       }, this);
-      this.tree.getSelection().addListener("change", function (e) {
-        var selection = this.tree.getSelection();
-        var node = selection.getItem(0);
-        if (node && !node.getDir()) {
-          this.fireDataEvent("openFile", node);
-        }
-      },this);
       this.loadContent (model.getPath(), model);
       this.model = model;
       this._newFileCommand = new qx.ui.core.Command();
@@ -79,6 +72,15 @@ qx.Class.define("carpo.FileBrowser", {
     },
     
     members : {
+      createTreeDelegate : function (filterfunc) {
+        return  {
+          bindItem : this.bindTreeItem,
+          onPool : this.poolTreeItem,
+          configureItem:this.configureTreeItem,
+          filter: filterfunc,
+          app: this
+        };        
+      },
       getSelectedTreeNode : function () {
         var selection = this.tree.getSelection();
         var node = selection.getItem(0);
@@ -151,11 +153,32 @@ qx.Class.define("carpo.FileBrowser", {
                 return new RegExp(selectedFilter).exec(label) === null;
             return true;
         };
-        this.tree.setDelegate({filter: filter, configureItem:this.configureTreeItem,app:this});
+        this.tree.setDelegate(this.createTreeDelegate(filter));
         this._application.setConfigValue("browser.currentfilter", selectedFilter);
       },
       configureTreeItem : function (item) {
         item.setContextMenu(this.app.getFileContextMenu());
+      },
+      bindTreeItem : function(controller, item, id) {
+        controller.bindDefaultProperties(item, id);
+        var mod = item.getModel();
+        if (mod && !mod.getDir()) {
+          var listenid = item.addListener("dblclick", function (e) {
+            var selection = this.tree.getSelection();
+            var node = selection.getItem(0);
+            if (node && !node.getDir()) {
+              this.fireDataEvent("openFile", node);
+            }
+          }, this.app);
+          item.setUserData("filebrowserdblclick", listenid);
+        }
+      },
+      poolTreeItem : function(item) {
+        var listid = item.getUserData("filebrowserdblclick");
+        if (listid) {
+          item.removeListenerById(listid);
+          item.setUserData("filebrowserdblclick",null);
+        }
       },
       
       getFileContextMenu : function() {

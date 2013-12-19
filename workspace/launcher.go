@@ -10,11 +10,12 @@ import (
 )
 
 type launchConfig struct {
-	id          string
-	name        string
-	executable  string
-	parameters  []string
-	environment []string
+	id               string
+	name             string
+	executable       string
+	workingDirectory string
+	parameters       []string
+	environment      []string
 }
 
 func (ws *workspace) getLaunchConfig(launchid string) (*launchConfig, error) {
@@ -29,6 +30,7 @@ func (ws *workspace) getLaunchConfig(launchid string) (*launchConfig, error) {
 	res.id = rc["id"].(string)
 	res.name = rc["name"].(string)
 	res.executable = rc["executable"].(string)
+	res.workingDirectory = rc["workingDirectory"].(string)
 	res.parameters = parseParameters(rc["params"].(string))
 	res.environment = parseEnvironment(rc["environment"].(string))
 	return ws.resolve(&res)
@@ -36,18 +38,25 @@ func (ws *workspace) getLaunchConfig(launchid string) (*launchConfig, error) {
 
 func (ws *workspace) launch(lc *launchConfig) *exec.Cmd {
 	cmd := exec.Command(lc.executable, lc.parameters...)
+	cmd.Dir = lc.workingDirectory
 	cmd.Env = lc.environment
 	return cmd
 }
 
 func (ws *workspace) resolve(lc *launchConfig) (*launchConfig, error) {
+	gobin := ws.gobinpath()
 	vals := struct {
 		Workspace string
+		GoBin     string
 	}{
-		filepath.Clean(ws.Path),
+		filepath.Clean(ws.Path), *gobin,
 	}
 	var err error
 	lc.executable, err = parse(lc.executable, vals)
+	if err != nil {
+		return nil, err
+	}
+	lc.workingDirectory, err = parse(lc.workingDirectory, vals)
 	if err != nil {
 		return nil, err
 	}

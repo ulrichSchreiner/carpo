@@ -47,15 +47,24 @@ qx.Class.define("carpo.RunConfiguration", {
       this.txtName = new qx.ui.form.TextField("");
       this.txtName.addListener ("input", this.valueChanged("name"), this);
       cent.add(this.txtName);
+      
       cent.add(new qx.ui.basic.Label("Executable"));
       this.txtExecutable = new qx.ui.form.TextField("");
       this.txtExecutable.setMinWidth(350);
       this.txtExecutable.addListener ("input", this.valueChanged("executable"), this);
       cent.add(this.txtExecutable);
+
+      cent.add(new qx.ui.basic.Label("Working Directory"));
+      this.txtWorkDir = new qx.ui.form.TextField("");
+      this.txtWorkDir.setMinWidth(350);
+      this.txtWorkDir.addListener ("input", this.valueChanged("workingDirectory"), this);
+      cent.add(this.txtWorkDir);
+
       cent.add(new qx.ui.basic.Label("Parameter (optionally surrounded  by \")"));
       this.txtParams = new qx.ui.form.TextField("");
       this.txtParams.addListener ("input", this.valueChanged("params"), this);
       cent.add(this.txtParams);
+
       cent.add(new qx.ui.basic.Label("Environment (<key>=<val> per Line)"));
       this.txtEnvironment = new qx.ui.form.TextArea("");
       this.txtEnvironment.addListener ("input", this.valueChanged("environment"), this);
@@ -64,12 +73,14 @@ qx.Class.define("carpo.RunConfiguration", {
       var data = new qx.data.Array();
       for (var c in settings.runconfig.configs) {
         var val = settings.runconfig.configs[c];
+        if (!val.workingDirectory) val.workingDirectory = "";
         data.push(qx.data.marshal.Json.createModel(val));
       }
       this.data = data;
       this.controller = new qx.data.controller.List (this.data, this.configList, "name");
       this.controller.bind("selection[0].name", this.txtName, "value");
       this.controller.bind("selection[0].executable", this.txtExecutable, "value");
+      this.controller.bind("selection[0].workingDirectory", this.txtWorkDir,"value");
       this.controller.bind("selection[0].params", this.txtParams, "value");
       this.controller.bind("selection[0].environment", this.txtEnvironment, "value");
       

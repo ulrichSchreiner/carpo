@@ -41,6 +41,7 @@ qx.Class.define("carpo.Application",
         // Call super class
         this.base(arguments);
         qx.Class.include(qx.ui.table.Table, qx.ui.table.MTableContextMenu);
+        qx.Class.include(qx.ui.tree.VirtualTreeItem,qx.ui.form.MModelProperty);
         
         // Enable logging in debug variant
         if (qx.core.Environment.get("qx.debug")) {
