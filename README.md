@@ -6,3 +6,5 @@ http://en.wikipedia.org/wiki/Horae
 This is *carpo*, a simple browserbased GoLang IDE.
 
 ![Screenshot](screenshot.png)
+
+Download it via [http://ulrichschreiner.github.io/]
