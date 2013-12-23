@@ -178,6 +178,7 @@ qx.Class.define("carpo.Application",
           if (config.settings && config.settings.editor)
             app.editors.configChanged(config.settings.editor);
           app.refreshIgnoredResources();
+          document.title = "Carpo ["+config.name.split("/").splice(-1)+"]";
           app.build();
         });
     },

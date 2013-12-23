@@ -314,6 +314,11 @@ func (serv *workspace) loadConfiguration() {
 		err = json.NewDecoder(f).Decode(&serv.config)
 		if err != nil {
 			log.Printf("Cannot decode .carpo.json: %s", err)
+		} else {
+			_, ok := serv.config["name"]
+			if !ok {
+				serv.config["name"] = serv.Path
+			}
 		}
 	}
 }
