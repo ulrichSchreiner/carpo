@@ -98,11 +98,11 @@ func (ws *GoWorkspace) importPackage(packname string, path string) error {
 	} else {
 		//TODO change this, set a ignore-list in the workspace
 		//if bytes.Compare([]byte(pack.Name), []byte("testdata")) != 0 {
-		if bytes.Compare([]byte(pack.Name), []byte("main")) != 0 {
-			ws.Packages[packname] = pack
-			ws.addDependency(pack, pack.Imports)
-			ws.addTestDependency(pack, pack.TestImports)
-		}
+		//if bytes.Compare([]byte(pack.Name), []byte("main")) != 0 {
+		ws.Packages[packname] = pack
+		ws.addDependency(pack, pack.Imports)
+		ws.addTestDependency(pack, pack.TestImports)
+		//}
 	}
 	return nil
 }

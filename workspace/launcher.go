@@ -30,9 +30,18 @@ func (ws *workspace) getLaunchConfig(launchid string) (*launchConfig, error) {
 	res.id = rc["id"].(string)
 	res.name = rc["name"].(string)
 	res.executable = rc["executable"].(string)
-	res.workingDirectory = rc["workingDirectory"].(string)
-	res.parameters = parseParameters(rc["params"].(string))
-	res.environment = parseEnvironment(rc["environment"].(string))
+	wd, ok := rc["workingDirectory"]
+	if ok {
+		res.workingDirectory = wd.(string)
+	}
+	par, ok := rc["params"]
+	if ok {
+		res.parameters = parseParameters(par.(string))
+	}
+	env, ok := rc["environment"]
+	if ok {
+		res.environment = parseEnvironment(env.(string))
+	}
 	return ws.resolve(&res)
 }
 
