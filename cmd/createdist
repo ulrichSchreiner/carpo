@@ -5,7 +5,7 @@ go build -o dist/carpo_raw
 cd ../qx/carpo
 ./generate build
 cd build
-zip -r ../../../cmd/dist/app.zip *
+zip -r ../../../cmd/dist/app.zip * -x *ace-builds*
 cd ../../../cmd/dist
 cat carpo_raw app.zip > carpo
 zip -A carpo

@@ -32,6 +32,12 @@ type BuildResult struct {
 	PackageImportPath string          `json:"packageimportpath"`
 }
 
+type Suggestion struct {
+	Class string `json:"class"`
+	Name  string `json:"name"`
+	Type  string `json:"type"`
+}
+
 type GoPackage struct {
 	ShortName string
 	LongName  string
@@ -155,4 +161,10 @@ func (ws *GoWorkspace) FullBuild(base string, ignoredPackages map[string]bool) (
 	parsed := ws.parseBuildOutput(base, res)
 	ws.Build = parsed
 	return &ws.Build, &dirs, nil
+}
+
+func (ws *GoWorkspace) Autocomplete(gocodebin string, content string, position int) ([]Suggestion, error) {
+	var sug []Suggestion
+	sug = append(sug, Suggestion{"func", "testname", "func (adfadf)"})
+	return sug, nil
 }

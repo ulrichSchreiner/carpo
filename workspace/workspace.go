@@ -54,16 +54,29 @@ func (w *workspace) register(container *restful.Container) {
 	container.Add(&ws)
 }
 
-type dirEntry struct {
-	Name  string `json:"name"`
-	IsDir bool   `json:"dir"`
-}
+type (
+	autocomplete struct {
+		Content  string `json:"content"`
+		Position int    `json:"position"`
+	}
 
-type dir struct {
-	Path        string     `json:"path"`
-	PathEntries []string   `json:"pathentries"`
-	Entries     []dirEntry `json:"entries"`
-}
+	autocompleteResult struct {
+		Suggestions []builder.Suggestion `json:"suggestions"`
+	}
+)
+
+type (
+	dirEntry struct {
+		Name  string `json:"name"`
+		IsDir bool   `json:"dir"`
+	}
+
+	dir struct {
+		Path        string     `json:"path"`
+		PathEntries []string   `json:"pathentries"`
+		Entries     []dirEntry `json:"entries"`
+	}
+)
 
 type fileContent struct {
 	Content  string `json:"content"`
@@ -426,6 +439,7 @@ type workspace struct {
 	Watcher     *fsnotify.Watcher
 	gotool      *string
 	goapptool   *string
+	gocode      *string
 	goworkspace *builder.GoWorkspace
 	config      map[string]interface{}
 
@@ -458,7 +472,7 @@ func NewWorkspace(path string) error {
 
 		path = filepath.Join(workdir, path)
 	}
-	w := workspace{path, nil, nil, nil, nil, nil, nil, new(sync.Mutex)}
+	w := workspace{path, nil, nil, nil, nil, nil, nil, nil, new(sync.Mutex)}
 	w.loadConfiguration()
 	w.processes = make(map[int]*os.Process)
 
@@ -478,6 +492,13 @@ func NewWorkspace(path string) error {
 	}
 	gobinpath := w.gobinpath()
 	log.Printf("Workspace uses %s as go", *gobinpath)
+	gocode, err := exec.LookPath("gocode")
+	if err != nil {
+		log.Printf("no gocode found in path: %s\n", err)
+	} else {
+		w.gocode = &gocode
+		log.Printf("gocode: %s", *w.gocode)
+	}
 
 	gws := builder.NewGoWorkspace(*gobinpath, []string{path})
 	w.goworkspace = gws

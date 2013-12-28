@@ -107,7 +107,19 @@ qx.Class.define("carpo.Editor",
                 var editor = this.__ace = ace.edit(container);
                 editor.setTheme("ace/theme/eclipse");
                 
-                // set javascript mode
+                var completer = ace.require("ace/ext/language_tools");
+                var goCompleter = {
+                  getCompletions: function(editor, session, pos, prefix, callback) {
+                    if (prefix.length === 0) { callback(null, []); return }
+                    var dummy = [
+                      {name:"myname",value:"myvalue",score:1, meta:"go"}
+                    ];
+                    callback (null, dummy);
+                  }};
+                completer.addCompleter(goCompleter);
+    
+                editor.setOptions({enableBasicAutocompletion: true});
+                
                 var mode = ace.require("ace/ext/modelist").getModeForPath(this.getFilename());
                 editor.getSession().setMode(mode.mode);
         
