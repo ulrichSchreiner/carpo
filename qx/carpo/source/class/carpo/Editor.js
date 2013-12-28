@@ -10,7 +10,7 @@ qx.Class.define("carpo.Editor",
         mode: { init: null },
         config: { init: null, nullable:true }
     },
-    construct : function(filepath, filename, content, mode, config) {
+    construct : function(filepath, filename, content, mode, config, workspace) {
         this.base(arguments, filename);
         this.setLayout(new qx.ui.layout.VBox(0));
         this.setFilepath(filepath);
@@ -19,6 +19,7 @@ qx.Class.define("carpo.Editor",
         this.setMode(mode);
         this.setConfig(config);
         this.setShowCloseButton(true);
+        this._workspace = workspace;
         this.__editor = new qx.ui.core.Widget();
         this.__editor.addListenerOnce("appear", function() {
           this.__onEditorAppear();
@@ -109,12 +110,18 @@ qx.Class.define("carpo.Editor",
                 
                 var completer = ace.require("ace/ext/language_tools");
                 var goCompleter = {
-                  getCompletions: function(editor, session, pos, prefix, callback) {
-                    //if (prefix.length === 0) { callback(null, []); return }
-                    var dummy = [
-                      {name:prefix+"myname",value:prefix+"myvalue",score:300, meta:"go"}
-                    ];
-                    callback (null, dummy);
+                  getCompletions: function(compEdit, compSession, pos, prefix, callback) {
+                    var rq = {
+                      content:compSession.getValue(),
+                      row:pos.row,
+                      column:pos.column
+                    };
+                    self._workspace.autocomplete(rq, function (sugg) {
+                      var suggestions = sugg.suggestions.map(function (s) {
+                        return {caption:s.nice, value:s.name};
+                      });
+                      callback(null, suggestions);
+                    });
                   }};
                 //completer.addCompleter(goCompleter);
 

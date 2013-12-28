@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"code.google.com/p/go.net/websocket"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/emicklei/go-restful"
 	"github.com/howeyc/fsnotify"
@@ -49,6 +50,7 @@ func (w *workspace) register(container *restful.Container) {
 	ws.Route(ws.POST("/config").To(w.saveConfig))
 	ws.Route(ws.GET("/config").To(w.loadConfig))
 	ws.Route(ws.POST("/build").To(w.buildWorkspace).Reads(buildRequest{}).Writes(buildResponse{}))
+	ws.Route(ws.POST("/autocomplete").To(w.autocomplete).Reads(autocomplete{}).Writes(autocompleteResult{}))
 	ws.Route(ws.GET("/process/{pid}/kill").To(w.killproc))
 	ws.Route(ws.GET("/exit").To(w.exitCarpo))
 	container.Add(&ws)
@@ -56,8 +58,9 @@ func (w *workspace) register(container *restful.Container) {
 
 type (
 	autocomplete struct {
-		Content  string `json:"content"`
-		Position int    `json:"position"`
+		Content string `json:"content"`
+		Column  int    `json:"column"`
+		Row     int    `json:"row"`
 	}
 
 	autocompleteResult struct {
@@ -303,7 +306,8 @@ func (serv *workspace) saveConfig(request *restful.Request, response *restful.Re
 	serv.config = conf.(map[string]interface{})
 	newgo := serv.gobinpath()
 	if bytes.Compare([]byte(*oldgo), []byte(*newgo)) != 0 {
-		gws := builder.NewGoWorkspace(*newgo, []string{serv.Path})
+		gws := builder.NewGoWorkspace(*newgo, []string{serv.Path}, serv.gocode)
+		serv.goworkspace.Shutdown()
 		serv.goworkspace = gws
 	}
 	b, err := json.MarshalIndent(conf, "", "  ")
@@ -428,6 +432,41 @@ func (serv *workspace) killProcess(pid int) {
 func (serv *workspace) exitCarpo(request *restful.Request, response *restful.Response) {
 	os.Exit(0)
 }
+func (serv *workspace) autocomplete(request *restful.Request, response *restful.Response) {
+	if serv.gocode == nil {
+		sendError(response, http.StatusBadRequest, errors.New("No gocode found in system"))
+		return
+	}
+	rq := new(autocomplete)
+	err := request.ReadEntity(&rq)
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Error reading autocomplete request: %s", err))
+		return
+	}
+	rsp := new(autocompleteResult)
+	pos := rq.Column
+	if rq.Row > 0 {
+		pos = findPosition(rq.Content+"\n", rq.Row, rq.Column)
+	}
+	suggestions, err := serv.goworkspace.Autocomplete(serv.gocode, rq.Content, pos)
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Error calculating suggestions: %s", err))
+		return
+	}
+	rsp.Suggestions = suggestions
+	response.WriteEntity(rsp)
+}
+
+func findPosition(content string, row int, col int) (abslen int) {
+	buf := bytes.NewBufferString(content)
+	for i := 0; i < row; i++ {
+		line, _ := buf.ReadString('\n')
+		abslen += len(line)
+	}
+	abslen += col
+	log.Printf("found: %s", content[abslen:abslen+5])
+	return
+}
 
 func sendError(response *restful.Response, status int, err error) {
 	response.WriteHeader(status)
@@ -500,7 +539,7 @@ func NewWorkspace(path string) error {
 		log.Printf("gocode: %s", *w.gocode)
 	}
 
-	gws := builder.NewGoWorkspace(*gobinpath, []string{path})
+	gws := builder.NewGoWorkspace(*gobinpath, []string{path}, w.gocode)
 	w.goworkspace = gws
 
 	wsContainer := restful.NewContainer()

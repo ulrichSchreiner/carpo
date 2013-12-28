@@ -1,10 +1,14 @@
 package builder
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"go/build"
+	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -36,6 +40,7 @@ type Suggestion struct {
 	Class string `json:"class"`
 	Name  string `json:"name"`
 	Type  string `json:"type"`
+	Nice  string `json:"nice"`
 }
 
 type GoPackage struct {
@@ -61,9 +66,10 @@ type GoWorkspace struct {
 	testneededBy     map[string][]string
 	testdependencies map[string][]string
 	gobinpath        string
+	gocode           *os.Process
 }
 
-func NewGoWorkspace(gobin string, gopath []string) *GoWorkspace {
+func NewGoWorkspace(gobin string, gopath []string, gocode *string) *GoWorkspace {
 	g := new(GoWorkspace)
 	g.gobinpath = gobin
 	g.Packages = make(map[string]*build.Package)
@@ -85,6 +91,8 @@ func NewGoWorkspace(gobin string, gopath []string) *GoWorkspace {
 		filepath.Walk(srcSystem.path, srcSystem.walker)
 	}
 	g.context.GOROOT = goroot
+	g.context.GOARCH, _ = g.env("GOARCH")
+	g.context.GOOS, _ = g.env("GOOS")
 	log.Printf("CONTEXT:%+v", g.context)
 	for i, src := range gopath {
 		srcd := new(srcDir)
@@ -101,9 +109,15 @@ func NewGoWorkspace(gobin string, gopath []string) *GoWorkspace {
 	}
 
 	g.resolve()
+
 	return g
 }
 
+func (ws *GoWorkspace) Shutdown() {
+	if ws.gocode != nil {
+		ws.gocode.Kill()
+	}
+}
 func (ws *GoWorkspace) BuildPackage(base string, packdir string) (*[]BuildResult, *[]string, error) {
 	args := []string{}
 	dirs := []string{}
@@ -163,8 +177,62 @@ func (ws *GoWorkspace) FullBuild(base string, ignoredPackages map[string]bool) (
 	return &ws.Build, &dirs, nil
 }
 
-func (ws *GoWorkspace) Autocomplete(gocodebin string, content string, position int) ([]Suggestion, error) {
-	var sug []Suggestion
-	sug = append(sug, Suggestion{"func", "testname", "func (adfadf)"})
-	return sug, nil
+func (ws *GoWorkspace) Autocomplete(gocodebin *string, content string, position int) (sug []Suggestion, err error) {
+	cmd := exec.Command(*gocodebin, "-f=json", "autocomplete", fmt.Sprintf("%d", position))
+	cmd.Env = []string{
+		fmt.Sprintf("GOPATH=%s", ws.context.GOPATH),
+		fmt.Sprintf("GOROOT=%s", ws.context.GOROOT),
+		fmt.Sprintf("GOARCH=%s", ws.context.GOARCH),
+		fmt.Sprintf("GOOS=%s", ws.context.GOOS)}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		log.Printf("Error no StdoutPipe: %s", err)
+		return
+	}
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		log.Printf("Error no StdinPipe: %s", err)
+		return
+	}
+	if err = cmd.Start(); err != nil {
+		log.Printf("Error when starting gocode process: %s", err)
+		return
+	}
+	stdin.Write([]byte(content))
+	stdin.Close()
+	out, err := ioutil.ReadAll(stdout)
+	if err != nil {
+		return
+	} else {
+		log.Printf("Result gocode: %s", string(out))
+	}
+	cmd.Wait()
+	var found []interface{}
+	err = json.Unmarshal(out, &found)
+	if err != nil {
+		log.Printf("Error parsing gocode output:%s", err)
+		return
+	}
+	if len(found) > 0 {
+		// first element is the number of matching chars --> ignore it
+		// second element is an array of maps
+		arraymatches := found[1].([]interface{})
+		for _, m := range arraymatches {
+			if suggest, ok := m.(map[string]interface{}); ok {
+				class := suggest["class"].(string)
+				name := suggest["name"].(string)
+				tp := suggest["type"].(string)
+				nice := fmt.Sprintf("%s : %s", name, tp)
+				if bytes.Equal([]byte("package"), []byte(class)) {
+					nice = fmt.Sprintf("Import '%s'", name)
+					name = ""
+				}
+				if strings.HasPrefix(tp, class) {
+					nice = fmt.Sprintf("%s%s", name, tp[len(class):])
+				}
+				sug = append(sug, Suggestion{class, name, tp, nice})
+			}
+		}
+	}
+	return
 }

@@ -165,7 +165,7 @@ qx.Class.define("carpo.EditorsPane",
           if (ed) {
               return ed;
           } else {
-              var page = new carpo.Editor(path, title, content, filemode, this._config);
+              var page = new carpo.Editor(path, title, content, filemode, this._config, this._workspace);
               page.addListener ("close", function (evt) {
                   this.editorClosed (evt.getTarget());
               }, this);

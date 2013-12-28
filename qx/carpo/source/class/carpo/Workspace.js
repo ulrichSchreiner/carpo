@@ -69,6 +69,10 @@ qx.Class.define("carpo.Workspace",
     exit : function (cb) {
       var d = this.__getresource("get","GET","/workspace/exit", cb);
       d.get();
+    },
+    autocomplete : function (data, cb) {
+      var d  = this.__getresource("post","POST","/workspace/autocomplete", cb);
+      d.post({}, data);
     }
     
   }
