@@ -110,15 +110,16 @@ qx.Class.define("carpo.Editor",
                 var completer = ace.require("ace/ext/language_tools");
                 var goCompleter = {
                   getCompletions: function(editor, session, pos, prefix, callback) {
-                    if (prefix.length === 0) { callback(null, []); return }
+                    //if (prefix.length === 0) { callback(null, []); return }
                     var dummy = [
-                      {name:"myname",value:"myvalue",score:1, meta:"go"}
+                      {name:prefix+"myname",value:prefix+"myvalue",score:300, meta:"go"}
                     ];
                     callback (null, dummy);
                   }};
-                completer.addCompleter(goCompleter);
-    
+                //completer.addCompleter(goCompleter);
+
                 editor.setOptions({enableBasicAutocompletion: true});
+                editor.completers = [goCompleter];
                 
                 var mode = ace.require("ace/ext/modelist").getModeForPath(this.getFilename());
                 editor.getSession().setMode(mode.mode);
