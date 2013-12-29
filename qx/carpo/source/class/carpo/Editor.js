@@ -130,7 +130,7 @@ qx.Class.define("carpo.Editor",
                               }
                             };
                           }
-                          if (s.class === "func") {
+                          if (s['class'] === "func") {
                             return {caption:s.nice, value:carpo.Go.getFuncSignatureWithoutReturn(s.nice)};
                           }
                           return {caption:s.nice, value:s.name};
