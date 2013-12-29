@@ -177,12 +177,16 @@ func (ws *GoWorkspace) FullBuild(base string, ignoredPackages map[string]bool) (
 	return &ws.Build, &dirs, nil
 }
 
-func (ws *GoWorkspace) Autocomplete(gocodebin *string, content string, position int) (sug []Suggestion, err error) {
+func (ws *GoWorkspace) Autocomplete(gocodebin *string, content string, position int, appengine bool) (sug []Suggestion, err error) {
 	cmd := exec.Command(*gocodebin, "-f=json", "autocomplete", fmt.Sprintf("%d", position))
+	goarch := ws.context.GOARCH
+	if appengine {
+		goarch = fmt.Sprintf("%s_appengine", goarch)
+	}
 	cmd.Env = []string{
 		fmt.Sprintf("GOPATH=%s", ws.context.GOPATH),
 		fmt.Sprintf("GOROOT=%s", ws.context.GOROOT),
-		fmt.Sprintf("GOARCH=%s", ws.context.GOARCH),
+		fmt.Sprintf("GOARCH=%s", goarch),
 		fmt.Sprintf("GOOS=%s", ws.context.GOOS)}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -213,6 +217,19 @@ func (ws *GoWorkspace) Autocomplete(gocodebin *string, content string, position 
 		log.Printf("Error parsing gocode output:%s", err)
 		return
 	}
+	ignore, err := ws.findImportsInCode(content)
+	if err != nil {
+		ignore = make(map[string]bool)
+	}
+	unres, err2 := ws.findUnresolvedAt(content, position)
+	if err2 == nil {
+		packs := ws.findPackagesWithName(unres, ignore)
+		for _, pack := range packs {
+			nice := fmt.Sprintf("Import '%s'", pack)
+			sug = append(sug, Suggestion{"import", pack, "import", nice})
+		}
+		sug = append(sug, Suggestion{})
+	}
 	if len(found) > 0 {
 		// first element is the number of matching chars --> ignore it
 		// second element is an array of maps
@@ -224,8 +241,7 @@ func (ws *GoWorkspace) Autocomplete(gocodebin *string, content string, position 
 				tp := suggest["type"].(string)
 				nice := fmt.Sprintf("%s : %s", name, tp)
 				if bytes.Equal([]byte("package"), []byte(class)) {
-					nice = fmt.Sprintf("Import '%s'", name)
-					name = ""
+					nice = name
 				}
 				if strings.HasPrefix(tp, class) {
 					nice = fmt.Sprintf("%s%s", name, tp[len(class):])

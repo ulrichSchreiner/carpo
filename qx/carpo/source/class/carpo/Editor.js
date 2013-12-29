@@ -117,10 +117,28 @@ qx.Class.define("carpo.Editor",
                       column:pos.column
                     };
                     self._workspace.autocomplete(rq, function (sugg) {
-                      var suggestions = sugg.suggestions.map(function (s) {
-                        return {caption:s.nice, value:s.name};
-                      });
-                      callback(null, suggestions);
+                      if (sugg.suggestions) {
+                        var suggestions = sugg.suggestions.map(function (s) {
+                          if (s.type === "import") {
+                            return {
+                              caption:s.nice, 
+                              value:s.name, 
+                              completer : {
+                                insertMatch:function(ed) {
+                                  new carpo.Go(ed.getValue()).addImport(ed, s.name);
+                                }
+                              }
+                            };
+                          }
+                          if (s.class === "func") {
+                            return {caption:s.nice, value:carpo.Go.getFuncSignatureWithoutReturn(s.nice)};
+                          }
+                          return {caption:s.nice, value:s.name};
+                        });
+                        callback(null, suggestions);
+                      } else {
+                        callback(null,[]);
+                      }
                     });
                   }};
                 //completer.addCompleter(goCompleter);

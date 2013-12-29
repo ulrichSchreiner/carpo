@@ -369,30 +369,38 @@ func (serv *workspace) buildWorkspace(request *restful.Request, response *restfu
 	response.WriteEntity(&result)
 }
 
-func (serv *workspace) gobinpath() *string {
+func (serv *workspace) get_build_type() (apptype buildType, go_settings map[string]interface{}, resok bool) {
 	if wssettings, ok := serv.config["settings"]; ok {
 		settings := wssettings.(map[string]interface{})
 		if val, ok := settings["go"]; ok {
-			go_settings := val.(map[string]interface{})
+			go_settings = val.(map[string]interface{})
 			apptype_s := go_settings[APPTYPE].(string)
-			apptype := buildType(apptype_s)
-			switch apptype {
-			case TYPE_GO:
-				gopath, _ := go_settings[SETTING_GOPATH]
-				if gopath != nil {
-					gp := gopath.(string)
-					return &gp
-				} else {
-					return serv.gotool
-				}
-			case TYPE_APPENGINE:
-				gopath, _ := go_settings[SETTING_GOAPPPATH]
-				if gopath != nil {
-					gp := gopath.(string)
-					return &gp
-				} else {
-					return serv.goapptool
-				}
+			apptype = buildType(apptype_s)
+			resok = true
+			return
+		}
+	}
+	return
+}
+
+func (serv *workspace) gobinpath() *string {
+	if apptype, go_settings, ok := serv.get_build_type(); ok {
+		switch apptype {
+		case TYPE_GO:
+			gopath, _ := go_settings[SETTING_GOPATH]
+			if gopath != nil {
+				gp := gopath.(string)
+				return &gp
+			} else {
+				return serv.gotool
+			}
+		case TYPE_APPENGINE:
+			gopath, _ := go_settings[SETTING_GOAPPPATH]
+			if gopath != nil {
+				gp := gopath.(string)
+				return &gp
+			} else {
+				return serv.goapptool
 			}
 		}
 	}
@@ -432,6 +440,7 @@ func (serv *workspace) killProcess(pid int) {
 func (serv *workspace) exitCarpo(request *restful.Request, response *restful.Response) {
 	os.Exit(0)
 }
+
 func (serv *workspace) autocomplete(request *restful.Request, response *restful.Response) {
 	if serv.gocode == nil {
 		sendError(response, http.StatusBadRequest, errors.New("No gocode found in system"))
@@ -448,7 +457,15 @@ func (serv *workspace) autocomplete(request *restful.Request, response *restful.
 	if rq.Row > 0 {
 		pos = findPosition(rq.Content+"\n", rq.Row, rq.Column)
 	}
-	suggestions, err := serv.goworkspace.Autocomplete(serv.gocode, rq.Content, pos)
+	isappengine := false
+	if appt, _, ok := serv.get_build_type(); ok {
+		switch appt {
+		case TYPE_APPENGINE:
+			isappengine = true
+		}
+	}
+
+	suggestions, err := serv.goworkspace.Autocomplete(serv.gocode, rq.Content, pos, isappengine)
 	if err != nil {
 		sendError(response, http.StatusBadRequest, fmt.Errorf("Error calculating suggestions: %s", err))
 		return
@@ -464,7 +481,6 @@ func findPosition(content string, row int, col int) (abslen int) {
 		abslen += len(line)
 	}
 	abslen += col
-	log.Printf("found: %s", content[abslen:abslen+5])
 	return
 }
 

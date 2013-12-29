@@ -2,8 +2,11 @@ package builder
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"go/build"
+	"go/parser"
+	"go/token"
 	"log"
 	"os"
 	"os/exec"
@@ -242,4 +245,62 @@ func (ws *GoWorkspace) parseBuildOutput(base string, output string) []BuildResul
 	}
 	// now parse output
 	return res
+}
+
+func (ws *GoWorkspace) findPackagesWithName(name string, ignore map[string]bool) (res []string) {
+	for _, v := range ws.SystemPackages {
+		pname := v.Name
+		importpath := v.ImportPath
+		if _, ok := ignore[importpath]; ok {
+			continue
+		}
+		if bytes.Equal([]byte(name), []byte(pname)) {
+			res = append(res, importpath)
+		}
+	}
+	for _, v := range ws.Packages {
+		pname := v.Name
+		importpath := v.ImportPath
+		if _, ok := ignore[importpath]; ok {
+			continue
+		}
+		if bytes.Equal([]byte(name), []byte(pname)) {
+			res = append(res, importpath)
+		}
+	}
+	return
+}
+
+func (ws *GoWorkspace) findImportsInCode(source string) (res map[string]bool, err error) {
+	fset := token.NewFileSet()
+
+	f, err := parser.ParseFile(fset, "source.go", source, parser.ImportsOnly)
+	if err != nil {
+		return
+	}
+
+	res = make(map[string]bool)
+	for _, s := range f.Imports {
+		v := s.Path.Value
+		res[v[1:len(v)-1]] = true // strip off the quotes at both ends
+	}
+	return
+}
+
+func (ws *GoWorkspace) findUnresolvedAt(source string, pos int) (tok string, err error) {
+	fset := token.NewFileSet()
+
+	f, err := parser.ParseFile(fset, "source.go", source, parser.DeclarationErrors)
+	if err != nil {
+		return
+	}
+
+	for _, s := range f.Unresolved {
+		offs := len(s.Name) + fset.Position(s.NamePos).Offset
+		if offs == pos {
+			tok = s.Name
+			return
+		}
+	}
+	return "", errors.New("no unresolved found")
 }
