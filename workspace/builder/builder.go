@@ -207,8 +207,13 @@ func (ws *GoWorkspace) buildtests(args ...string) (res string) {
 
 func (ws *GoWorkspace) parseBuildOutput(base string, output string) []BuildResult {
 	var res []BuildResult
+	resultset := make(map[BuildResult]bool)
 	lines := strings.Split(output, "\n")
 	for _, l := range lines {
+		if strings.HasPrefix(l, "#") {
+			continue
+		}
+		l = strings.TrimSpace(l)
 		b := []byte(l)
 		m := build_line.FindSubmatch(b)
 		if m != nil {
@@ -233,13 +238,18 @@ func (ws *GoWorkspace) parseBuildOutput(base string, output string) []BuildResul
 			} else {
 				br.Line = int(ln)
 			}
-			res = append(res, br)
+			if _, ok := resultset[br]; !ok {
+				// do not append the same message twice. this can happen, because wie build packages AND their tests
+				res = append(res, br)
+			}
 		} else {
 			if len(res) > 0 {
 				l = strings.TrimSpace(l)
-				last := &res[len(res)-1]
-				last.Original = last.Original + " " + l
-				last.Message = last.Message + " " + l
+				if len(l) > 0 {
+					last := &res[len(res)-1]
+					last.Original = last.Original + " " + l
+					last.Message = last.Message + " " + l
+				}
 			}
 		}
 	}
