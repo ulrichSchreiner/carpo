@@ -337,6 +337,8 @@ func (serv *workspace) loadConfiguration() {
 				serv.config["name"] = serv.Path
 			}
 		}
+	} else {
+		serv.config["name"] = serv.Path
 	}
 }
 

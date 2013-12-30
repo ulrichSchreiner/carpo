@@ -87,6 +87,7 @@ qx.Class.define("carpo.Application",
                 decorator:null,
                 statusBarVisible:false
                 });
+        this.compileroutput.getSelectionModel().setSelectionMode(qx.ui.table.selection.Model.SINGLE_INTERVAL_SELECTION);                
         this.compileroutput.setContextMenuHandler(0, this.problemContextMenu, this);
         this.compileroutput.addListener("cellDblclick", function (e) {
             var row = e.getRow();
@@ -156,6 +157,7 @@ qx.Class.define("carpo.Application",
                 decorator:null,
                 statusBarVisible:false
                 });
+        this.ignoredPackagesTable.getSelectionModel().setSelectionMode(qx.ui.table.selection.Model.SINGLE_INTERVAL_SELECTION);
         this.ignoredPackagesTable.setContextMenuHandler(0, this.ignoredPackagesContextMenu, this);
         tcm = this.ignoredPackagesTable.getTableColumnModel();
         resizeBehavior = tcm.getBehavior();
@@ -184,11 +186,13 @@ qx.Class.define("carpo.Application",
     },
     
     ignoredPackagesContextMenu : function (col, row, table, dataModel, contextMenu) {
-      var data = dataModel.getValue(1, row);
       var config = this.getConfig();
-      var me = new qx.ui.menu.Button ("Un-ignore '"+data+"'");
+      var me = new qx.ui.menu.Button ("Build packages");
       me.addListener("execute", function (e) {
-        delete(config.ignoredPackages[data]);
+        table.getSelectionModel().iterateSelection(function(ind) {
+          var data = dataModel.getValue(1, ind);
+          delete (config.ignoredPackages[data]);
+        });
         this.saveConfig();
         this.refreshIgnoredResources();        
       }, this);
@@ -197,18 +201,21 @@ qx.Class.define("carpo.Application",
     },
     
     problemContextMenu : function (col, row, table, dataModel, contextMenu) {
-      var data = dataModel.getValue(9, row);
       var config = this.getConfig();
-      if (!config.ignoredPackages[data.packageimportpath]) {
-        var me = new qx.ui.menu.Button ("Ignore '"+data.packageimportpath+"' when building");
-        me.addListener("execute", function (e) {
-          config.ignoredPackages[data.packageimportpath] = {};
-          this.saveConfig();
-          this.refreshIgnoredResources();
-        }, this);
-        contextMenu.add(me);
-        return true;      
-      }
+      var me = new qx.ui.menu.Button ("Ignore packages when building");
+      me.addListener("execute", function (e) {
+        table.getSelectionModel().iterateSelection(function(ind) {
+          var dat = dataModel.getValue(9, ind);
+          if (!config.ignoredPackages[dat.packageimportpath]) {
+            config.ignoredPackages[dat.packageimportpath] = {};
+          }
+        });
+        
+        this.saveConfig();
+        this.refreshIgnoredResources();
+      }, this);
+      contextMenu.add(me);
+      return true;      
     },
     refreshIgnoredResources : function () {
       var d = [];
