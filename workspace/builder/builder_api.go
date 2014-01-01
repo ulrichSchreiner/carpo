@@ -177,6 +177,24 @@ func (ws *GoWorkspace) FullBuild(base string, ignoredPackages map[string]bool) (
 	return &ws.Build, &dirs, nil
 }
 
+func (ws *GoWorkspace) InstallGocode(plugindir string) (gocodebinpath *string, err error) {
+	cmd := exec.Command(ws.gobinpath, "get", "-u", "github.com/nsf/gocode")
+	cmd.Dir = plugindir
+	cmd.Env = []string{
+		fmt.Sprintf("GOPATH=%s", plugindir),
+		os.ExpandEnv("PATH=$PATH"), // git must be installed!
+	}
+	log.Printf("install gocode: %+v", cmd)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		gopath := filepath.Join(plugindir, "bin", "gocode")
+		return &gopath, nil
+	} else {
+		err = fmt.Errorf("Error installing 'gocode': %s (%v)", string(out), err)
+	}
+	return
+}
+
 func (ws *GoWorkspace) Autocomplete(gocodebin *string, content string, path string, position int, appengine bool) (sug []Suggestion, err error) {
 	cmd := exec.Command(*gocodebin, "-f=json", "autocomplete", path, fmt.Sprintf("%d", position))
 	goarch := ws.context.GOARCH
@@ -207,8 +225,6 @@ func (ws *GoWorkspace) Autocomplete(gocodebin *string, content string, path stri
 	out, err := ioutil.ReadAll(stdout)
 	if err != nil {
 		return
-	} else {
-		log.Printf("Result gocode: %s", string(out))
 	}
 	cmd.Wait()
 	var found []interface{}

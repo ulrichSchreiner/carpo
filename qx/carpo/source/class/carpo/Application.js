@@ -181,6 +181,12 @@ qx.Class.define("carpo.Application",
             app.editors.configChanged(config.settings.editor);
           app.refreshIgnoredResources();
           document.title = "Carpo ["+config.name.split("/").splice(-1)+"]";
+
+          app.updateEnvironment (function (env) {
+            if (env.gocode && env.gocode.path)
+              app._installGocode.setEnabled(false);
+          });
+
           app.build();
         });
     },
@@ -246,6 +252,7 @@ qx.Class.define("carpo.Application",
             app.fireDataEvent("configChanged", app._configuration);
         });
     },
+    
     _generateDefaultConfig : function (config) {
         if (!config.settings)
             config.settings = carpo.Settings.getSettings(null);
@@ -309,6 +316,8 @@ qx.Class.define("carpo.Application",
         this._runCommand.addListener("execute", this.run, this);
         this._saveAllCommand = new qx.ui.core.Command();
         this._saveAllCommand.addListener("execute", this.saveAll, this);
+        this._installGocode = new qx.ui.core.Command();
+        this._installGocode.addListener("execute", this.installGocode, this);
     },
     getRunningToolbar : function (output) {
       var toolbar = new qx.ui.toolbar.ToolBar();
@@ -414,6 +423,8 @@ qx.Class.define("carpo.Application",
         
         var fileMenu = new qx.ui.menubar.Button("File", null, this.getFileMenu());
         var viewMenu = new qx.ui.menubar.Button("View", null, this.getViewMenu());
+        var toolsMenu= new qx.ui.menubar.Button("Tools", null, this.getToolsMenu());
+        
         //var editMenu = new qx.ui.menubar.Button("Edit", null, this.getEditMenu());
         //var searchMenu = new qx.ui.menubar.Button("Search", null, this.getSearchMenu());
         //var viewMenu = new qx.ui.menubar.Button("View", null, this.getViewMenu());
@@ -422,6 +433,7 @@ qx.Class.define("carpo.Application",
         
         menubar.add(fileMenu);
         menubar.add(viewMenu);
+        menubar.add(toolsMenu);
         
         //menubar.add(editMenu);
         //menubar.add(searchMenu);
@@ -468,6 +480,15 @@ qx.Class.define("carpo.Application",
         menu.add(exitButton);
         
         return menu;
+    },
+    
+    getToolsMenu : function () {
+      var menu = new qx.ui.menu.Menu ();
+      
+      var installgocode = new qx.ui.menu.Button ("Install autocomplete (gocode)", null, this._installGocode);
+      menu.add (installgocode);
+      
+      return menu;
     },
     
     saveFile : function (evt) {
@@ -675,6 +696,25 @@ qx.Class.define("carpo.Application",
       return service;
       
     },
+    installGocode : function (evt) {
+      var app = this;
+      this.workspace.installgocode (function (env) {
+        if (env.gocode && env.gocode.path) {
+          app._installGocode.setEnabled(false);
+          alert("Autocomplete should work now");
+        }
+      }, function (err) {
+        var err = qx.lang.Json.parse(err.getData());
+        alert (err.Message);
+      });
+    },
+    updateEnvironment : function (cb) {
+      var self = this;
+      this.workspace.loadEnvironment(function (env) {
+        cb(env);
+      });
+    },
+    
     debugButton : function (event) {
         this.debug("Execute button: " + this.getLabel());
     }

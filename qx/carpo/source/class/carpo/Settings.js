@@ -146,13 +146,6 @@ qx.Class.define("carpo.Settings", {
             this.apptype = selectBox;
             form.add (this.apptype, "Application Type");
             
-            var gocodepath = new qx.ui.form.TextField().set({
-                placeholder:"path to 'gocode' command (or search on PATH)"
-            });
-            if (this._settings.go.gocode_path) gocodepath.setValue(this._settings.go.gocode_path);
-            this.gocodepath = gocodepath;
-            form.add(this.gocodepath, "gocode Path");
-
             var page = new qx.ui.tabview.Page("Go");
             page.setLayout(new qx.ui.layout.VBox());
             var renderer = new qx.ui.form.renderer.Single(form);

@@ -49,6 +49,8 @@ func (w *workspace) register(container *restful.Container) {
 	ws.Route(ws.POST("/file").To(w.save).Reads(fileSaveRequest{}).Writes(fileSaveResponse{}))
 	ws.Route(ws.POST("/config").To(w.saveConfig))
 	ws.Route(ws.GET("/config").To(w.loadConfig))
+	ws.Route(ws.GET("/environment").To(w.loadEnvironment))
+	ws.Route(ws.GET("/install/gocode").To(w.installGocode))
 	ws.Route(ws.POST("/build").To(w.buildWorkspace).Reads(buildRequest{}).Writes(buildResponse{}))
 	ws.Route(ws.POST("/autocomplete").To(w.autocomplete).Reads(autocomplete{}).Writes(autocompleteResult{}))
 	ws.Route(ws.GET("/process/{pid}/kill").To(w.killproc))
@@ -66,6 +68,11 @@ type (
 
 	autocompleteResult struct {
 		Suggestions []builder.Suggestion `json:"suggestions"`
+	}
+)
+type (
+	gocodeenv struct {
+		Path *string `json:"path"`
 	}
 )
 
@@ -324,6 +331,28 @@ func (serv *workspace) loadConfig(request *restful.Request, response *restful.Re
 	json.NewEncoder(response).Encode(serv.config)
 }
 
+func (serv *workspace) loadEnvironment(request *restful.Request, response *restful.Response) {
+	res := make(map[string]interface{})
+
+	var gocodesettings gocodeenv
+
+	gocodesettings.Path = serv.gocode
+	//gocodesettings.Path = nil
+	res["gocode"] = gocodesettings
+	response.WriteEntity(res)
+}
+
+func (serv *workspace) installGocode(request *restful.Request, response *restful.Response) {
+	gocode, err := serv.goworkspace.InstallGocode(serv.plugindir)
+	if err != nil {
+		sendError(response, http.StatusInternalServerError, err)
+		return
+	} else {
+		serv.gocode = gocode
+	}
+	serv.loadEnvironment(request, response)
+}
+
 func (serv *workspace) loadConfiguration() {
 	f, err := os.Open(filepath.Join(serv.Path, ".carpo.json"))
 	serv.config = make(map[string]interface{})
@@ -494,6 +523,7 @@ func sendError(response *restful.Response, status int, err error) {
 
 type workspace struct {
 	Path        string
+	plugindir   string
 	Watcher     *fsnotify.Watcher
 	gotool      *string
 	goapptool   *string
@@ -530,7 +560,17 @@ func NewWorkspace(path string) error {
 
 		path = filepath.Join(workdir, path)
 	}
-	w := workspace{path, nil, nil, nil, nil, nil, nil, nil, new(sync.Mutex)}
+	plugindir := filepath.Join(path, ".carpoplugins")
+	err := os.Mkdir(plugindir, 0755)
+	if err != nil && !os.IsExist(err) {
+		log.Fatalf("cannot create subdirectory '.carpoplugins': %s", err)
+	} else {
+		os.Mkdir(filepath.Join(plugindir, "src"), 0755)
+		os.Mkdir(filepath.Join(plugindir, "pkg"), 0755)
+		os.Mkdir(filepath.Join(plugindir, "bin"), 0755)
+	}
+
+	w := workspace{path, plugindir, nil, nil, nil, nil, nil, nil, nil, new(sync.Mutex)}
 	w.loadConfiguration()
 	w.processes = make(map[int]*os.Process)
 
@@ -550,11 +590,11 @@ func NewWorkspace(path string) error {
 	}
 	gobinpath := w.gobinpath()
 	log.Printf("Workspace uses %s as go", *gobinpath)
-	gocode, err := exec.LookPath("gocode")
+	gocode, err := findInPluginsOrEnvironment(plugindir, "gocode")
 	if err != nil {
 		log.Printf("no gocode found in path: %s\n", err)
 	} else {
-		w.gocode = &gocode
+		w.gocode = gocode
 		log.Printf("gocode: %s", *w.gocode)
 	}
 
@@ -568,6 +608,19 @@ func NewWorkspace(path string) error {
 	http.Handle("/launch/", logged(websocket.Handler(launchProcessHandler(&w))))
 	//http.Handle("/wsworkspace", logged(websocket.Handler(workspaceHandler(&w))))
 	return nil
+}
+
+func findInPluginsOrEnvironment(plugindir string, toolname string) (toolpath *string, err error) {
+	tool := filepath.Join(plugindir, "bin", toolname)
+	if _, err := os.Stat(tool); err == nil {
+		return &tool, nil
+	}
+
+	tool, err = exec.LookPath(toolname)
+	if err != nil {
+		return
+	}
+	return &tool, nil
 }
 
 func transformEvent(ws *workspace, evt *fsnotify.FileEvent) (*fileevent, error) {

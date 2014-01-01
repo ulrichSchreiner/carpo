@@ -35,6 +35,10 @@ qx.Class.define("carpo.Workspace",
       d.get();
     },
     
+    loadEnvironment : function (cb,errcb) {
+      var d = this.__getresource("get","GET","/workspace/environment", cb,errcb);
+      d.get();
+    },
     saveconfig : function (data, cb, errcb) {
       var d = this.__getresource("post","POST","/workspace/config", cb,errcb);
       d.post({}, data);          
@@ -73,7 +77,10 @@ qx.Class.define("carpo.Workspace",
     autocomplete : function (data, cb) {
       var d  = this.__getresource("post","POST","/workspace/autocomplete", cb);
       d.post({}, data);
+    },
+    installgocode : function (cb,errcb) {
+      var d = this.__getresource("get","GET","/workspace/install/gocode", cb, errcb);
+      d.get();
     }
-    
   }
 });
