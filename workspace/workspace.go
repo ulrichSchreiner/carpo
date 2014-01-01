@@ -59,6 +59,7 @@ func (w *workspace) register(container *restful.Container) {
 type (
 	autocomplete struct {
 		Content string `json:"content"`
+		Path    string `json:"path"`
 		Column  int    `json:"column"`
 		Row     int    `json:"row"`
 	}
@@ -467,7 +468,7 @@ func (serv *workspace) autocomplete(request *restful.Request, response *restful.
 		}
 	}
 
-	suggestions, err := serv.goworkspace.Autocomplete(serv.gocode, rq.Content, pos, isappengine)
+	suggestions, err := serv.goworkspace.Autocomplete(serv.gocode, rq.Content, filepath.Join(serv.Path, rq.Path), pos, isappengine)
 	if err != nil {
 		sendError(response, http.StatusBadRequest, fmt.Errorf("Error calculating suggestions: %s", err))
 		return

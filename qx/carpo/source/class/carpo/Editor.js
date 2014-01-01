@@ -113,6 +113,7 @@ qx.Class.define("carpo.Editor",
                   getCompletions: function(compEdit, compSession, pos, prefix, callback) {
                     var rq = {
                       content:compSession.getValue(),
+                      path:self.getFilepath(),
                       row:pos.row,
                       column:pos.column
                     };

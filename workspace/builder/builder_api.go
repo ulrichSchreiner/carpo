@@ -177,8 +177,8 @@ func (ws *GoWorkspace) FullBuild(base string, ignoredPackages map[string]bool) (
 	return &ws.Build, &dirs, nil
 }
 
-func (ws *GoWorkspace) Autocomplete(gocodebin *string, content string, position int, appengine bool) (sug []Suggestion, err error) {
-	cmd := exec.Command(*gocodebin, "-f=json", "autocomplete", fmt.Sprintf("%d", position))
+func (ws *GoWorkspace) Autocomplete(gocodebin *string, content string, path string, position int, appengine bool) (sug []Suggestion, err error) {
+	cmd := exec.Command(*gocodebin, "-f=json", "autocomplete", path, fmt.Sprintf("%d", position))
 	goarch := ws.context.GOARCH
 	if appengine {
 		goarch = fmt.Sprintf("%s_appengine", goarch)
