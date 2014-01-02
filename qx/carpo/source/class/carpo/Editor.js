@@ -66,7 +66,8 @@ qx.Class.define("carpo.Editor",
         },
         setEditorValue : function (val, clean) {
           var pos = this.__ace.getCursorPosition();
-          this.__ace.getSession().setValue(val);
+          //this.__ace.getSession().setValue(val);
+          this.__ace.setValue(val,-1);
           if (pos) {
             this.__ace.moveCursorToPosition(pos);
             this.__ace.scrollToLine(pos.row, true, false, function() {});
