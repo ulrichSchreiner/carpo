@@ -3,6 +3,7 @@ package workspace
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -93,7 +94,7 @@ func parse(templ string, vals interface{}) (string, error) {
 	if err := t.Execute(&b, vals); err != nil {
 		return "", err
 	}
-	return string(b.Bytes()), nil
+	return os.ExpandEnv(string(b.Bytes())), nil
 }
 
 func parseEnvironment(env string) []string {

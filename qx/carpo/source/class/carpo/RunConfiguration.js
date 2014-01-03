@@ -106,6 +106,7 @@ qx.Class.define("carpo.RunConfiguration", {
       }, this);
       box.add(btn4);
       this.addListener("keypress", function (e) {
+        if (e.getTarget() == this.txtEnvironment) return; // in textarea we allow ENTER :-)
         if(e.getKeyIdentifier() == "Enter") {
           btn3.focus();
           btn3.execute();

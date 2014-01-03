@@ -364,7 +364,7 @@ func (serv *workspace) loadConfiguration() {
 		} else {
 			_, ok := serv.config["name"]
 			if !ok {
-				serv.config["name"] = serv.Path
+				serv.config["name"] = filepath.Base(serv.Path)
 			}
 		}
 	} else {
