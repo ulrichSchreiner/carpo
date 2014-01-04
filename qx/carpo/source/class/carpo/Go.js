@@ -14,7 +14,7 @@ qx.Class.define("carpo.Go",
       var parms = sig.substring(prefix.length+1,idx);
       var tupels = parms.split(",");
       var res = methname+"(";
-      var paramlen = 1;
+      var paramlen = 0;
       for (var i=0, t; t = tupels[i]; i++) {
         t = t.replace(/(^\s+|\s+$)/g,'');
         var pname = t.split(" ");

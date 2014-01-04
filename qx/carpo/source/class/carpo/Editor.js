@@ -143,9 +143,11 @@ qx.Class.define("carpo.Editor",
                                   ed.session.remove(range);
                                   var insert = carpo.Go.getFuncParamList("func",s.type,s.name);
                                   ed.execCommand("insertstring", insert.text);
-                                  range.start.column += (insert.len);
-                                  ed.moveCursorToPosition(range.start);
-                                  ed.session.getSelection().selectWordRight();
+                                  if (insert.paramlen > 0) {
+                                    range.start.column += (insert.len);
+                                    ed.moveCursorToPosition(range.start);
+                                    ed.session.getSelection().selectWordRight();
+                                  }
                                 }
                               }
                             };
