@@ -133,7 +133,22 @@ qx.Class.define("carpo.Editor",
                             };
                           }
                           if (s['class'] === "func") {
-                            return {caption:s.nice, value:carpo.Go.getFuncSignatureWithoutReturn(s.nice)};
+                            return {
+                              caption:s.nice, 
+                              value:carpo.Go.getFuncSignatureWithoutReturn(s.nice),
+                              completer : {
+                                insertMatch:function(ed) {
+                                  var range = ed.selection.getAllRanges()[0];
+                                  range.start.column -= ed.completer.completions.filterText.length;
+                                  ed.session.remove(range);
+                                  var insert = carpo.Go.getFuncParamList("func",s.type,s.name);
+                                  ed.execCommand("insertstring", insert.text);
+                                  range.start.column += (insert.len);
+                                  ed.moveCursorToPosition(range.start);
+                                  ed.session.getSelection().selectWordRight();
+                                }
+                              }
+                            };
                           }
                           return {caption:s.nice, value:s.name};
                         });

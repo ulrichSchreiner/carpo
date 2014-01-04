@@ -8,6 +8,30 @@ qx.Class.define("carpo.Go",
     getFuncSignatureWithoutReturn : function (signature) {
       var idx = signature.indexOf(")");
       return signature.substring(0,idx+1);
+    },
+    getFuncParamList : function (prefix,sig,methname) {
+      var idx = sig.indexOf(")");
+      var parms = sig.substring(prefix.length+1,idx);
+      var tupels = parms.split(",");
+      var res = methname+"(";
+      var paramlen = 1;
+      for (var i=0, t; t = tupels[i]; i++) {
+        t = t.replace(/(^\s+|\s+$)/g,'');
+        var pname = t.split(" ");
+        if (i === 0) {
+          paramlen = pname[0].length;
+        }
+        res = res + pname[0];
+        if (i < tupels.length-1) {
+          res = res +", ";
+        }
+      }
+      res = res + ")";
+      return {
+        text:res,
+        len:methname.length+1,
+        paramlen: paramlen
+      }
     }
   },
   members : {
