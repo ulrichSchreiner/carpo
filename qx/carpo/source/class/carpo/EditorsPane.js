@@ -101,6 +101,7 @@ qx.Class.define("carpo.EditorsPane",
         _configChanged : function (e) {
           if (this.__silent) return;
           var config = e.getData();  
+          this._config = config;
           for (var ek in this._openeditors) {
               var ed = this._openeditors[ek];
               ed.configChanged (config);

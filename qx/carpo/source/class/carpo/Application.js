@@ -180,7 +180,10 @@ qx.Class.define("carpo.Application",
           if (config.settings && config.settings.editor)
             app.editors.configChanged(config.settings.editor);
           app.refreshIgnoredResources();
-          document.title = "Carpo ["+config.name.split("/").splice(-1)+"]";
+          var name = config.name;
+          if (name[name.length-1]==="/") 
+            name = name.substring(0, name.length-1);
+          document.title = "Carpo ["+name.split("/").splice(-1)+"]";
 
           app.updateEnvironment (function (env) {
             if (env.gocode && env.gocode.path)
