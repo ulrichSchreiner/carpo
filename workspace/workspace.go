@@ -257,7 +257,7 @@ func (serv *workspace) rmfile(request *restful.Request, response *restful.Respon
 		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Path: %s", err))
 		return
 	}
-	err = os.Remove(path)
+	err = os.RemoveAll(path)
 
 	if err != nil {
 		sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot rm dir: %s", err))

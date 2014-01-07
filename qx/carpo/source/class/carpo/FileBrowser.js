@@ -237,9 +237,11 @@ qx.Class.define("carpo.FileBrowser", {
         var self = this;
         if (node) {
           var pt = node.getPath();
-          self._workspace.rm(pt, function (cb) {
-            self.removeItem(self.model, node);
-          });
+          if (confirm("Do you really want to delete '"+node.getPath()+"'?")) {
+            self._workspace.rm(pt, function (cb) {
+              self.removeItem(self.model, node);
+            });
+          }
         }            
       },
       
