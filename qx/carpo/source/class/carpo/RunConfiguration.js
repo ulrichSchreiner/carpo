@@ -139,8 +139,9 @@ qx.Class.define("carpo.RunConfiguration", {
           id : "config-"+num,
           name :"New Configuration",
           executable:"{{.Workspace}}/bin/yourprogram",
+          workingDirectory:"{{.Workspace}}",
           params : "",
-          environment : "ENV1=val1"
+          environment : "PATH=$PATH"
         });
       }
     }
