@@ -13,6 +13,7 @@
  *
  * @asset(carpo/*)
  * @asset(qx/icon/${qx.icontheme}/16/actions/*)
+ * @asset(qx/icon/${qx.icontheme}/16/status/*)
  * @asset(qx/icon/${qx.icontheme}/32/status/*)
  */
 qx.Class.define("carpo.Application",
@@ -74,7 +75,7 @@ qx.Class.define("carpo.Application",
             allowGrowX: true
         });
         this.compileroutputModel = new qx.ui.table.model.Simple();
-        this.compileroutputModel.setColumns([ "Source", "Line", "Column","Message" ]);
+        this.compileroutputModel.setColumns([ "","Source", "Line", "Column","Message" ]);
         var custom = {
             tableColumnModel : function(obj) {
                 return new qx.ui.table.columnmodel.Resize(obj);
@@ -92,16 +93,20 @@ qx.Class.define("carpo.Application",
         this.compileroutput.addListener("cellDblclick", function (e) {
             var row = e.getRow();
             var data = this.compileroutputModel.getRowData(row);
-            this.showError (data[0], data[1], data[2], data[3]);
+            this.showError (data[1], data[2], data[3], data[4]);
         }, this);
         var tcm = this.compileroutput.getTableColumnModel();
-
+      
         var resizeBehavior = tcm.getBehavior();
 
-        resizeBehavior.setWidth(0, "20%");
-        resizeBehavior.setWidth(1, "5%");
+        resizeBehavior.setWidth(0, "5%");
+        resizeBehavior.setWidth(1, "20%");
         resizeBehavior.setWidth(2, "5%");
-        resizeBehavior.setWidth(3, "70%");
+        resizeBehavior.setWidth(3, "5%");
+        resizeBehavior.setWidth(4, "65%");
+
+        var renderer = new qx.ui.table.cellrenderer.Image();
+        this.compileroutput.getTableColumnModel().setDataCellRenderer(0, renderer);
         
         this.editors = new carpo.EditorsPane(this, this.workspace, null);
         this.editors.setDecorator("main");
@@ -129,6 +134,7 @@ qx.Class.define("carpo.Application",
         problems.setLayout(new qx.ui.layout.HBox(0));
         output.add(problems);
         problems.add(this.compileroutput,{flex:1});
+        this.problems = problems;
         var runoutput = new qx.ui.tabview.Page("Run/Debug Console");
         runoutput.setLayout(new qx.ui.layout.VBox(0));
         this.txtRunoutput = new qx.ui.form.TextArea("");
@@ -555,15 +561,22 @@ qx.Class.define("carpo.Application",
         if (result && result.buildoutput) {
           this.currentBuildoutput = result.buildoutput;
           result.buildoutput.forEach(function (o) {
-            if (o.type === "error")
+            var url = null;
+            if (o.type === "error") {
+              url = "icon/16/status/dialog-error.png";
               hasError = true;
-            data.push([o.file,o.line,o.column, o.message,null,null,null,null,null,o]); 
+            }
+            data.push([url,o.file,o.line,o.column, o.message,null,null,null,null,null,o]); 
           });
         } else {
           this.currentBuildoutput = null;
         }
         this.showAnnotations();
         this.compileroutputModel.setData(data);
+        if (hasError)
+          this.problems.setIcon("icon/16/status/dialog-error.png");
+        else
+          this.problems.setIcon(null);
         return hasError;
     },
     showAnnotations : function () {
