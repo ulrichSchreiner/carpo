@@ -51,6 +51,7 @@ func (w *workspace) register(container *restful.Container) {
 	ws.Route(ws.GET("/config").To(w.loadConfig))
 	ws.Route(ws.GET("/environment").To(w.loadEnvironment))
 	ws.Route(ws.GET("/install/gocode").To(w.installGocode))
+	ws.Route(ws.GET("/install/package").To(w.installPackage))
 	ws.Route(ws.POST("/build").To(w.buildWorkspace).Reads(buildRequest{}).Writes(buildResponse{}))
 	ws.Route(ws.POST("/autocomplete").To(w.autocomplete).Reads(autocomplete{}).Writes(autocompleteResult{}))
 	ws.Route(ws.GET("/process/{pid}/kill").To(w.killproc))
@@ -342,6 +343,15 @@ func (serv *workspace) loadEnvironment(request *restful.Request, response *restf
 	response.WriteEntity(res)
 }
 
+func (serv *workspace) installPackage(request *restful.Request, response *restful.Response) {
+	pkg := request.QueryParameter("pkg")
+	err := serv.goworkspace.InstallPackage(pkg, serv.plugindir)
+	if err != nil {
+		sendError(response, http.StatusInternalServerError, err)
+	} else {
+		serv.loadEnvironment(request, response)
+	}
+}
 func (serv *workspace) installGocode(request *restful.Request, response *restful.Response) {
 	gocode, err := serv.goworkspace.InstallGocode(serv.plugindir)
 	if err != nil {

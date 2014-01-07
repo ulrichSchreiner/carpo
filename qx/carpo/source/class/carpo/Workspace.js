@@ -25,6 +25,10 @@ qx.Class.define("carpo.Workspace",
       var d = this.__getresource("kill","GET","/workspace/process/{pid}/kill", cb);
       d.kill({pid:pid});
     },
+    installPackage : function (pkg, cb) {
+      var d = this.__getresource("install","GET","/workspace/install/package", cb);
+      d.install({},"pkg="+pkg);
+    },
     dir : function (pt, cb) {
       var d = this.__getresource("dir","GET","/workspace/dir", cb);
       d.dir({},"path="+pt);

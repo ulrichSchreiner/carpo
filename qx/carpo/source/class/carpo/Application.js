@@ -75,7 +75,8 @@ qx.Class.define("carpo.Application",
             allowGrowX: true
         });
         this.compileroutputModel = new qx.ui.table.model.Simple();
-        this.compileroutputModel.setColumns([ "","Source", "Line", "Column","Message" ]);
+        var columns = [ "","Source", "Line", "Column","Message" ];
+        this.compileroutputModel.setColumns(columns);
         var custom = {
             tableColumnModel : function(obj) {
                 return new qx.ui.table.columnmodel.Resize(obj);
@@ -89,7 +90,8 @@ qx.Class.define("carpo.Application",
                 statusBarVisible:false
                 });
         this.compileroutput.getSelectionModel().setSelectionMode(qx.ui.table.selection.Model.SINGLE_INTERVAL_SELECTION);                
-        this.compileroutput.setContextMenuHandler(0, this.problemContextMenu, this);
+        for (var i=0; i<columns.length; i++)
+          this.compileroutput.setContextMenuHandler(i, this.problemContextMenu, this);
         this.compileroutput.addListener("cellDblclick", function (e) {
             var row = e.getRow();
             var data = this.compileroutputModel.getRowData(row);
@@ -230,6 +232,18 @@ qx.Class.define("carpo.Application",
         this.refreshIgnoredResources();
       }, this);
       contextMenu.add(me);
+      var re = /cannot find package \"(.*?)\" .*/;
+      var dat = dataModel.getValue(9,row);
+      var ok = re.exec(dat.message);
+      if (ok) {
+        me = new qx.ui.menu.Button ("Install '"+ok[1]+"'");
+        me.addListener("execute", function (e) {
+          this.workspace.installPackage(ok[1], function () {
+            alert ("Package '"+ok[1]+" installed. Please rebuild (STRG+B).");
+          });
+        }, this);
+        contextMenu.add(me);
+      }
       return true;      
     },
     refreshIgnoredResources : function () {
@@ -566,7 +580,7 @@ qx.Class.define("carpo.Application",
               url = "icon/16/status/dialog-error.png";
               hasError = true;
             }
-            data.push([url,o.file,o.line,o.column, o.message,null,null,null,null,null,o]); 
+            data.push([url,o.file,o.line,o.column, o.message,null,null,null,null,o]); 
           });
         } else {
           this.currentBuildoutput = null;

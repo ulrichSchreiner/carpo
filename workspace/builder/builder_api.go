@@ -177,6 +177,18 @@ func (ws *GoWorkspace) FullBuild(base string, ignoredPackages map[string]bool) (
 	return &ws.Build, &dirs, nil
 }
 
+func (ws *GoWorkspace) InstallPackage(pkg string, plugindir string) (err error) {
+	cmd := exec.Command(ws.gobinpath, "get", "-u", pkg)
+	cmd.Dir = plugindir
+	cmd.Env = []string{
+		fmt.Sprintf("GOPATH=%s", ws.Path),
+		os.ExpandEnv("PATH=$PATH"), // git must be installed!
+	}
+	log.Printf("install %s: %+v", pkg, cmd)
+	_, err = cmd.CombinedOutput()
+	return err
+}
+
 func (ws *GoWorkspace) InstallGocode(plugindir string) (gocodebinpath *string, err error) {
 	cmd := exec.Command(ws.gobinpath, "get", "-u", "github.com/nsf/gocode")
 	cmd.Dir = plugindir
