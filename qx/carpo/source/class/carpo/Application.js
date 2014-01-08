@@ -572,6 +572,7 @@ qx.Class.define("carpo.Application",
     showBuildResult : function (result) {
         var data = [];
         var hasError = false;
+        var hasWarning = false
         if (result && result.buildoutput) {
           this.currentBuildoutput = result.buildoutput;
           result.buildoutput.forEach(function (o) {
@@ -579,6 +580,10 @@ qx.Class.define("carpo.Application",
             if (o.type === "error") {
               url = "icon/16/status/dialog-error.png";
               hasError = true;
+            }
+            if (o.type === "warning") {
+              url = "icon/16/status/dialog-warning.png";
+              hasWarning = true;
             }
             data.push([url,o.file,o.line,o.column, o.message,null,null,null,null,o]); 
           });
@@ -589,6 +594,8 @@ qx.Class.define("carpo.Application",
         this.compileroutputModel.setData(data);
         if (hasError)
           this.problems.setIcon("icon/16/status/dialog-error.png");
+        else if (hasWarning)
+          this.problems.setIcon("icon/16/status/dialog-warning.png");
         else
           this.problems.setIcon(null);
         return hasError;

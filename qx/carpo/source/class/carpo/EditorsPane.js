@@ -219,7 +219,7 @@ qx.Class.define("carpo.EditorsPane",
                        row:p.line-1,
                        column:p.column,
                        text:p.message,
-                       type:"error"                        
+                       type:p.type                        
                     });
                 }
             });

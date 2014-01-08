@@ -20,6 +20,7 @@ type goCommand string
 
 const (
 	goCommand_build goCommand = "install"
+	goCommand_vet   goCommand = "vet"
 	goCommand_env   goCommand = "env"
 	goCommand_test  goCommand = "test"
 	workdir                   = ".carpowork"
@@ -193,6 +194,14 @@ func (ws *GoWorkspace) build(args ...string) (res string, err error) {
 	return res, err
 }
 
+func (ws *GoWorkspace) vet(args ...string) (res string, err error) {
+	res, err = ws.gocmd(ws.gobinpath, string(goCommand_vet), ws.Workdir, args...)
+	if err == nil {
+		//res = res + "\n" + ws.buildtests(gobin, args...)
+	}
+	return res, err
+}
+
 func (ws *GoWorkspace) buildtests(args ...string) (res string) {
 	for _, p := range args {
 		if ws.packageHasTests(p) {
@@ -206,6 +215,9 @@ func (ws *GoWorkspace) buildtests(args ...string) (res string) {
 }
 
 func (ws *GoWorkspace) parseBuildOutput(base string, output string) []BuildResult {
+	return ws.parseBuildTypedOutput(base, output, BUILD_ERROR)
+}
+func (ws *GoWorkspace) parseBuildTypedOutput(base string, output string, etype BuildResultType) []BuildResult {
 	var res []BuildResult
 	resultset := make(map[BuildResult]bool)
 	lines := strings.Split(output, "\n")
@@ -220,7 +232,7 @@ func (ws *GoWorkspace) parseBuildOutput(base string, output string) []BuildResul
 			var br BuildResult
 			br.Original = l
 			br.Source = string(m[1])
-			br.Type = BUILD_ERROR
+			br.Type = etype
 			// we always work in a subdirectory named ".carpowork", so strip the ".." from the filepath
 			br.File = br.Source[2:]
 			br.Directory = filepath.Dir(br.File)

@@ -16,7 +16,8 @@ import (
 type BuildResultType string
 
 const (
-	BUILD_ERROR BuildResultType = "error"
+	BUILD_ERROR   BuildResultType = "error"
+	BUILD_WARNING BuildResultType = "warning"
 )
 
 /*
@@ -155,6 +156,14 @@ func (ws *GoWorkspace) BuildPackage(base string, packdir string) (*[]BuildResult
 	}
 	res = res + "\n" + ws.buildtests(args...)
 	parsed := ws.parseBuildOutput(base, res)
+	if len(parsed) == 0 {
+		// vet only if no compile error
+		vetres, err := ws.vet(packagesToRecompile...)
+		if err == nil {
+			vetparsed := ws.parseBuildTypedOutput(base, vetres, BUILD_WARNING)
+			parsed = append(parsed, vetparsed...)
+		}
+	}
 	ws.Build = ws.mergeBuildResults(packagesToRecompile, parsed)
 	return &ws.Build, &dirs, nil
 }
@@ -172,8 +181,20 @@ func (ws *GoWorkspace) FullBuild(base string, ignoredPackages map[string]bool) (
 	if err != nil {
 		return nil, nil, err
 	}
+	var vres *string
+	if len(res) == 0 {
+		svres, err := ws.vet(args...)
+		if err != nil {
+			return nil, nil, err
+		}
+		vres = &svres
+	}
 	parsed := ws.parseBuildOutput(base, res)
-	ws.Build = parsed
+	if vres != nil {
+		vparsed := ws.parseBuildTypedOutput(base, *vres, BUILD_WARNING)
+		parsed = append(parsed, vparsed...)
+	}
+	ws.Build = append(parsed)
 	return &ws.Build, &dirs, nil
 }
 
