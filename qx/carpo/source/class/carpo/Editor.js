@@ -20,6 +20,7 @@ qx.Class.define("carpo.Editor",
         this.setConfig(config);
         this.setShowCloseButton(true);
         this._workspace = workspace;
+        this._contextMenuRow = -1;
         this.__editor = new qx.ui.core.Widget();
         this.__editor.addListenerOnce("appear", function() {
           this.__onEditorAppear();
@@ -29,6 +30,42 @@ qx.Class.define("carpo.Editor",
     },
     
     members: {
+        getGutterContextMenu : function (e) {
+          if (!this.gutterContextMenu) {
+            var menu = new qx.ui.menu.Menu();
+            var toggleBP = new qx.ui.menu.Button("Toggle Breakpoint");
+            toggleBP.addListener("execute", this.addBreakpoint, this);
+            var addMarker = new qx.ui.menu.Button("Add Marker");
+            addMarker.addListener("execute", this.addMarker, this);
+            menu.add(toggleBP);
+            //menu.add(addMarker); only partial implemented
+            this.gutterContextMenu = menu;
+          }
+          return this.gutterContextMenu;
+        },
+        showGutterMenu : function (e) {
+          if (e.getButton() == 2) { 
+            var m = this.getGutterContextMenu();
+            var pos = {left:e.clientX,top:e.clientY};
+            qx.bom.Event.stopPropagation(e); 
+            this._contextMenuRow = e.getDocumentPosition().row ;
+            m.openAtPoint({ 
+              top: e.clientY, 
+              left: e.clientX 
+            }); 
+          }
+        },
+        addMarker : function (e) {
+        },
+        addBreakpoint : function (e) {
+          var row = this._contextMenuRow;
+          var session = this.__ace.session;
+          
+          var bp = session.getBreakpoints()[row];
+          bp = bp ? "" : " ace_breakpoint ";
+
+          session.setBreakpoint(row, bp) ;
+        },
         focus : function () {
           if (this.__ace)
             this.__ace.focus();
@@ -46,7 +83,7 @@ qx.Class.define("carpo.Editor",
         },
         
         _fontFromConfig : function () {
-            var font = "14px monospace"
+            var font = "14px monospace";
             var config = this.getConfig();
             if (config && config.settings.editor.font) {
                 var f = config.settings.editor.font;
@@ -87,7 +124,7 @@ qx.Class.define("carpo.Editor",
           if (this.__ace) {
             this.__annotations = null;
             this.__ace.getSession().clearAnnotations();
-            this.__ace.getSession().setAnnotations(annos);            
+            this.__ace.getSession().setAnnotations(annos);
           } else {
             this.__annotations = annos;
           }
@@ -187,6 +224,7 @@ qx.Class.define("carpo.Editor",
                     self.setLabel("*"+self.getFilename());
                     self.setDirty(true);
                 });
+                this.__ace.on("guttermousedown", qx.lang.Function.bind(this.showGutterMenu, this));
                 // append resize listener
                 this.__editor.addListener("resize", function() {
                   // use a timeout to let the layout queue apply its changes to the dom

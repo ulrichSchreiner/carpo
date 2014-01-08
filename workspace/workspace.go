@@ -396,7 +396,6 @@ func (serv *workspace) buildWorkspace(request *restful.Request, response *restfu
 			ignoredPackages[k] = true
 		}
 	}
-	log.Printf("ignore packages: %+v", ignoredPackages)
 	result.BuildType = BUILD_GOLANG
 	output, dirs, err := serv.goworkspace.FullBuild(serv.Path, ignoredPackages)
 	if err != nil {
@@ -616,6 +615,7 @@ func NewWorkspace(path string) error {
 
 	http.Handle("/workspace/", logged(wsContainer))
 	http.Handle("/launch/", logged(websocket.Handler(launchProcessHandler(&w))))
+	http.Handle("/debug/", logged(websocket.Handler(debugProcessHandler(&w))))
 	//http.Handle("/wsworkspace", logged(websocket.Handler(workspaceHandler(&w))))
 	return nil
 }

@@ -291,6 +291,9 @@ qx.Class.define("carpo.Application",
         if (!config.ignoredPackages) {
           config.ignoredPackages = {};
         }
+        if (!config.markers) {
+          config.markers = [];
+        }
     },
     setConfigValue : function (key, val) {
       this._setConfigValue (key, val);
@@ -397,6 +400,9 @@ qx.Class.define("carpo.Application",
       }, this);
       menu.add(newConfig);
       
+      this.debugButton = new qx.ui.form.Button(null,qx.util.ResourceManager.getInstance().toUri("carpo/Debug-Bug-2-icon.png"),null);
+      toolbar.add(this.debugButton);
+      this.debugButton.addListener("execute", this.debug, this);
       this.runButton = new qx.ui.form.SplitButton(null,"icon/16/actions/go-next.png", menu);
       toolbar.add(this.runButton);
       this.runButton.addListener ("execute", this.run, this);
@@ -568,6 +574,17 @@ qx.Class.define("carpo.Application",
         //}
       });
     },
+    debug : function (evt) {
+      var self = this;
+      this.build(evt, function (res, hasErrors) {
+        //if (!hasErrors) {
+          var conf = self.getConfig();
+          var lc = conf.runconfig.configs[conf.runconfig.current];
+          var proc = self.launchProcess(lc);
+          proc.connect(); 
+        //}
+      });
+    },
     
     showBuildResult : function (result) {
         var data = [];
@@ -601,7 +618,8 @@ qx.Class.define("carpo.Application",
         return hasError;
     },
     showAnnotations : function () {
-      this.editors.showAnnotations(this.currentBuildoutput || []);
+      var markers = this.getConfig().markers;
+      this.editors.showAnnotations(this.currentBuildoutput || [], markers);
     },
     showError : function (src, line, column, message) {
         var app = this;
@@ -682,6 +700,12 @@ qx.Class.define("carpo.Application",
       dlg.show();
     },
     launchProcess : function (launch) {
+      return this._launchProcess("launch", launch);
+    },
+    debugProcess : function (launch) {
+      return this._launchProcess("debug", launch);
+    },
+    _launchProcess : function (launchtype, launch) {
       var service = {};
       service.launchconfig = launch;
       service.pid = null;
@@ -697,7 +721,7 @@ qx.Class.define("carpo.Application",
       service.connect = function() {
         var pid = "";
         if(service.ws) { return; }
-        var ws = new WebSocket(prot+h+":"+p+"/launch/"+launch.id);
+        var ws = new WebSocket(prot+h+":"+p+"/"+launchtype+"/"+launch.id);
         
         ws.onopen = function(e) {
           //console.log("on open");

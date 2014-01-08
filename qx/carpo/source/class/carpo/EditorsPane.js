@@ -206,9 +206,12 @@ qx.Class.define("carpo.EditorsPane",
         getCurrentEditor : function () {
             return this.getSelection()[0];
         },
-        showAnnotations : function (probs) {
+        showAnnotations : function (probs, markers) {
             var self = this;
             var annotations = {};
+            var all = [];
+            all.concat(probs);
+            all.concat(markers);
             probs.forEach (function (p) {
                 var ed = self.getEditorFor(p.file);
                 if (ed) {
