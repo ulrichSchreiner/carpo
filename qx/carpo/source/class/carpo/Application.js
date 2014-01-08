@@ -580,7 +580,7 @@ qx.Class.define("carpo.Application",
         //if (!hasErrors) {
           var conf = self.getConfig();
           var lc = conf.runconfig.configs[conf.runconfig.current];
-          var proc = self.launchProcess(lc);
+          var proc = self.debugProcess(lc);
           proc.connect(); 
         //}
       });
@@ -700,40 +700,47 @@ qx.Class.define("carpo.Application",
       dlg.show();
     },
     launchProcess : function (launch) {
-      return this._launchProcess("launch", launch);
-    },
-    debugProcess : function (launch) {
-      return this._launchProcess("debug", launch);
-    },
-    _launchProcess : function (launchtype, launch) {
       var service = {};
       service.launchconfig = launch;
       service.pid = null;
       service.output = "";
       service.name = launch.name;
       
-      var model = qx.data.marshal.Json.createModel(service);
-      
+      return this._launchProcess("launch", launch, service);
+    },
+    debugProcess : function (launch) {
+      var service = {};
+      service.launchconfig = launch;
+      service.pid = null;
+      service.output = "";
+      service.defaultname = "DEBUG: "+launch.name;
+      service.name = launch.name;
+
+      return this._launchProcess("debug", launch, service);
+    },
+    getWebsocket : function (launchtype, launch) {
       var h = window.location.hostname;
       var p = window.location.port;
       var prot = window.location.protocol=="http:" ? "ws://" : "wss://";
+      return new WebSocket(prot+h+":"+p+"/"+launchtype+"/"+launch.id);
+    },
+    
+    _launchProcess : function (launchtype, launch, service) {
+      var model = qx.data.marshal.Json.createModel(service);
+      
       var self = this;
       service.connect = function() {
         var pid = "";
         if(service.ws) { return; }
-        var ws = new WebSocket(prot+h+":"+p+"/"+launchtype+"/"+launch.id);
+        var ws = self.getWebsocket(launchtype, launch);
         
-        ws.onopen = function(e) {
-          //console.log("on open");
-        };
+        ws.onopen = function(e) { };
   
-        ws.onerror = function(e) {
-          console.log("on error");
-        };
+        ws.onerror = function(e) { console.log("on error"); };
         
         ws.onclose = function (e) {
           model.setPid("");    
-          model.setName(launch.name+" [STOPPED]");
+          model.setName(model.getDefaultname()+" [STOPPED]");
         };
   
         ws.onmessage = function(e) {
@@ -742,11 +749,10 @@ qx.Class.define("carpo.Application",
             pid = pid + data;
             if (pid[pid.length-1] == "\n") {
               model.setPid(pid.trim());    
-              model.setName(launch.name+" ["+model.getPid()+"]");
+              model.setName(model.getDefaultname()+" ["+model.getPid()+"]");
             }
           } else {
             model.setOutput(model.getOutput()+e.data);
-            //self.txtRunoutput.setValue(self.txtRunoutput.getValue()+e.data);
           }
         };
   
@@ -755,7 +761,6 @@ qx.Class.define("carpo.Application",
       this.processes.push(model);
       this.processList.setModelSelection([model]);
       return service;
-      
     },
     installGocode : function (evt) {
       var app = this;
@@ -765,8 +770,8 @@ qx.Class.define("carpo.Application",
           alert("Autocomplete should work now");
         }
       }, function (err) {
-        var err = qx.lang.Json.parse(err.getData());
-        alert (err.Message);
+        var er = qx.lang.Json.parse(err.getData());
+        alert (er.Message);
       });
     },
     updateEnvironment : function (cb) {
