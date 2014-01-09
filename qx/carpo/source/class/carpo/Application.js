@@ -541,7 +541,7 @@ qx.Class.define("carpo.Application",
       var menu = new qx.ui.menu.Menu ();
       
       var addimport = new qx.ui.menu.Button ("Add import", null, this._addImport);
-      var addpackage = new qx.ui.menu.Button("Add package",null, this._addPackage);
+      var addpackage = new qx.ui.menu.Button("Install package",null, this._addPackage);
       
       menu.add (addimport);
       menu.add (addpackage);
