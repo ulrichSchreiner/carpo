@@ -54,6 +54,8 @@ func (w *workspace) register(container *restful.Container) {
 	ws.Route(ws.GET("/install/package").To(w.installPackage))
 	ws.Route(ws.POST("/build").To(w.buildWorkspace).Reads(buildRequest{}).Writes(buildResponse{}))
 	ws.Route(ws.POST("/autocomplete").To(w.autocomplete).Reads(autocomplete{}).Writes(autocompleteResult{}))
+	ws.Route(ws.GET("/querypackages").To(w.querypackages).Writes(query_packages{}))
+	ws.Route(ws.GET("/queryremotepackages").To(w.queryremotepackages).Writes(query_packages{}))
 	ws.Route(ws.GET("/process/{pid}/kill").To(w.killproc))
 	ws.Route(ws.GET("/exit").To(w.exitCarpo))
 	container.Add(&ws)
@@ -69,6 +71,15 @@ type (
 
 	autocompleteResult struct {
 		Suggestions []builder.Suggestion `json:"suggestions"`
+	}
+)
+type (
+	query_package struct {
+		Name  string `json:"name"`
+		Descr string `json:"description"`
+	}
+	query_packages struct {
+		Packages []query_package `json:"packages"`
 	}
 )
 type (
@@ -482,6 +493,24 @@ func (serv *workspace) exitCarpo(request *restful.Request, response *restful.Res
 	os.Exit(0)
 }
 
+func (serv *workspace) querypackages(request *restful.Request, response *restful.Response) {
+	var result query_packages
+	local := serv.goworkspace.QueryPackages()
+	for _, p := range local.Results {
+		result.Packages = append(result.Packages, query_package{Name: p.Path, Descr: p.Synopsis})
+	}
+	response.WriteEntity(result)
+}
+func (serv *workspace) queryremotepackages(request *restful.Request, response *restful.Response) {
+	var result query_packages
+	q := request.QueryParameter("q")
+	remote := serv.goworkspace.QueryRemotePackages(q)
+	for _, p := range remote.Results {
+		result.Packages = append(result.Packages, query_package{Name: p.Path, Descr: p.Synopsis})
+	}
+	response.WriteEntity(result)
+}
+
 func (serv *workspace) autocomplete(request *restful.Request, response *restful.Response) {
 	if serv.gocode == nil {
 		sendError(response, http.StatusBadRequest, errors.New("No gocode found in system"))
@@ -506,7 +535,7 @@ func (serv *workspace) autocomplete(request *restful.Request, response *restful.
 		}
 	}
 
-	suggestions, err := serv.goworkspace.Autocomplete(serv.gocode, rq.Content, filepath.Join(serv.Path, rq.Path), pos, isappengine)
+	suggestions, err := serv.goworkspace.Autocomplete(serv.gocode, rq.Content, filepath.Join(serv.Path, rq.Path), pos, rq.Row, rq.Column, isappengine)
 	if err != nil {
 		sendError(response, http.StatusBadRequest, fmt.Errorf("Error calculating suggestions: %s", err))
 		return

@@ -51,7 +51,7 @@ qx.Class.define("carpo.Application",
             // support additional cross-browser console. Press F7 to toggle visibility
             qx.log.appender.Console;
         }
-        this.workspace = new carpo.Workspace();
+        this.workspace = new carpo.Workspace(this);
         carpo.EditorsPane.loadAce(qx.lang.Function.bind(this.init, this));
     },
 
@@ -201,6 +201,12 @@ qx.Class.define("carpo.Application",
           app.build();
         });
     },
+    showStatusMessage : function (msg, pending) {
+      if (pending)
+        this.status.setValue("<i>"+msg+"</i>");
+      else
+        this.status.setValue("<b>"+msg+"</b>");
+    },
     
     ignoredPackagesContextMenu : function (col, row, table, dataModel, contextMenu) {
       var config = this.getConfig();
@@ -344,6 +350,10 @@ qx.Class.define("carpo.Application",
         this._saveAllCommand.addListener("execute", this.saveAll, this);
         this._installGocode = new qx.ui.core.Command();
         this._installGocode.addListener("execute", this.installGocode, this);
+        this._addImport = new qx.ui.core.Command("Ctrl-Shift-M");
+        this._addImport.addListener("execute", this.addImport, this);
+        this._addPackage = new qx.ui.core.Command("Ctrl-Shift-J");
+        this._addPackage.addListener("execute", this.addPackage, this);
     },
     getRunningToolbar : function (output) {
       var toolbar = new qx.ui.toolbar.ToolBar();
@@ -406,6 +416,12 @@ qx.Class.define("carpo.Application",
       this.runButton = new qx.ui.form.SplitButton(null,"icon/16/actions/go-next.png", menu);
       toolbar.add(this.runButton);
       this.runButton.addListener ("execute", this.run, this);
+      toolbar.addSpacer();
+      this.status = new qx.ui.basic.Label ();
+      this.status.setRich(true);
+      this.status.setPadding(5);
+      toolbar.add(this.status);
+      this.showStatusMessage ("Ready!", false);
       return toolbar;
     },
     
@@ -453,6 +469,7 @@ qx.Class.define("carpo.Application",
         var fileMenu = new qx.ui.menubar.Button("File", null, this.getFileMenu());
         var viewMenu = new qx.ui.menubar.Button("View", null, this.getViewMenu());
         var toolsMenu= new qx.ui.menubar.Button("Tools", null, this.getToolsMenu());
+        var sourceMenu= new qx.ui.menubar.Button("Source", null, this.getSourceMenu());
         
         //var editMenu = new qx.ui.menubar.Button("Edit", null, this.getEditMenu());
         //var searchMenu = new qx.ui.menubar.Button("Search", null, this.getSearchMenu());
@@ -463,6 +480,7 @@ qx.Class.define("carpo.Application",
         menubar.add(fileMenu);
         menubar.add(viewMenu);
         menubar.add(toolsMenu);
+        menubar.add(sourceMenu);
         
         //menubar.add(editMenu);
         //menubar.add(searchMenu);
@@ -516,6 +534,17 @@ qx.Class.define("carpo.Application",
       
       var installgocode = new qx.ui.menu.Button ("Install autocomplete (gocode)", null, this._installGocode);
       menu.add (installgocode);
+      
+      return menu;
+    },
+    getSourceMenu : function () {
+      var menu = new qx.ui.menu.Menu ();
+      
+      var addimport = new qx.ui.menu.Button ("Add import", null, this._addImport);
+      var addpackage = new qx.ui.menu.Button("Add package",null, this._addPackage);
+      
+      menu.add (addimport);
+      menu.add (addpackage);
       
       return menu;
     },
@@ -774,12 +803,142 @@ qx.Class.define("carpo.Application",
         alert (er.Message);
       });
     },
+    addPackage : function (evt) {
+      var ws = this.workspace;
+      this.showFilteredPopup(evt, "Search Remote Package", true, function(data) {
+      }, function (ed, val) {
+        ws.installPackage(val.getName(), function () {
+          new carpo.Go(ed.getAceEditor().getValue()).addImport(ed.getAceEditor(), val.getName());
+        });
+      }, function (filtvalue, data, list) {
+        data.removeAll();
+        var re = null;
+        if (filtvalue && filtvalue.length>2) {
+          ws.queryRemotePackages (filtvalue, function (res) {
+            if (res && res.packages) {
+              res.packages.sort(function (a,b) {return (a.name<b.name)?-1:1});
+              res.packages.forEach(function (r) {
+                data.push(qx.data.marshal.Json.createModel(r,false));
+              });
+            }
+          });
+        }
+      });
+    },
+    addImport : function (evt) {
+      var ws = this.workspace;
+      this.showFilteredPopup(evt, "Search Local Package", false, function(data) {
+        ws.queryPackages (function (res) {
+          res.packages.sort(function (a,b) {return (a.name<b.name)?-1:1});
+          res.packages.forEach(function (r) {
+            data.push(qx.data.marshal.Json.createModel(r,false));
+          });
+        });
+      }, function (ed, val) {
+        new carpo.Go(ed.getAceEditor().getValue()).addImport(ed.getAceEditor(), val.getName());
+      }, function (filtvalue, data, list) {
+        var re = null;
+        if (filtvalue) {
+          re = new RegExp(filtvalue, 'i');
+        }
+        list.setDelegate ({
+          filter: function(data) {
+            if (re) {
+              return data.getName().match(re);
+            }
+            return true;
+          }
+        });
+      });
+    },
+    showFilteredPopup : function (evt, title, withdesc, loadfunc, selfunc, onfilterchange) {
+      var popup = new qx.ui.popup.Popup(new qx.ui.layout.VBox(3)).set({
+        backgroundColor: "#FFFAD3",
+        padding: [2, 4],
+        offset : 3,
+        offsetBottom : 20,
+        width: 600,
+        height: 400
+      });
+
+      var head = new qx.ui.basic.Atom(title);
+      head.setDecorator("main");
+      popup.add(head);
+      var filter = new qx.ui.form.TextField();
+      popup.add(filter);
+      var data = new qx.data.Array();
+      var list = new qx.ui.list.List(data);
+      list.setLabelPath("name");
+      filter.addListener ("input", function (e) {
+        onfilterchange(filter.getValue(), data, list);
+      }, this);
+      
+      popup.add(list,{flex:1});
+      loadfunc(data);
+      popup.addListener("keypress", function (e) {
+        if(e.getKeyIdentifier() == "Enter") {
+          var ed = this.editors.getCurrentEditor();
+          if (ed) {
+            selfunc(ed, list.getSelection().toArray()[0]);
+          }
+          popup.setVisibility("hidden");
+          if (ed)
+            ed.getAceEditor().focus();
+        } else if (e.getKeyIdentifier() == "Escape") {
+          popup.setVisibility("hidden");
+          var ed = this.editors.getCurrentEditor();
+          if (ed)
+            ed.getAceEditor().focus();
+        }
+      }, this);
+      list.addListener("dblclick", function (e) {
+          var ed = this.editors.getCurrentEditor();
+          if (ed) {
+            selfunc(ed, list.getSelection().toArray()[0]);
+          }
+          popup.setVisibility("hidden");
+          var ed = this.editors.getCurrentEditor();
+          if (ed)
+            ed.getAceEditor().focus();
+      }, this);
+      if (withdesc) {
+        var desc = new qx.ui.basic.Atom("<i>... Description ...</i>");
+        desc.setDecorator("main");
+        desc.setRich(true);
+        popup.add(desc);
+        list.getSelection().addListener("change", function (e) {
+          if (e.getData().added)
+            desc.setLabel(e.getData().added[0].getDescription());
+        },this);
+      }
+      this.center(popup);
+      popup.show();
+      filter.focus();
+    },
     updateEnvironment : function (cb) {
       var self = this;
       this.workspace.loadEnvironment(function (env) {
         cb(env);
       });
     },
+
+    center : function(widget) {
+      var parent = this.getRoot();
+      if (parent) {
+        var bounds = parent.getBounds();
+        if (bounds) {
+          var hint = widget.getSizeHint();
+
+          var left = Math.round((bounds.width - hint.width) / 2);
+          var top = Math.round((bounds.height - hint.height) / 2);
+
+          if (top < 0) {
+            top = 0;
+          }
+          widget.moveTo(left, top);
+        }
+      }
+    },    
     
     debugButton : function (event) {
         this.debug("Execute button: " + this.getLabel());

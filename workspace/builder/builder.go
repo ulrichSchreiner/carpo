@@ -2,12 +2,14 @@ package builder
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"go/build"
 	"go/parser"
 	"go/token"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,11 +27,13 @@ const (
 	goCommand_test  goCommand = "test"
 	workdir                   = ".carpowork"
 	abssrc                    = "/src/"
+	godoc_org                 = "http://api.godoc.org"
 )
 
 var (
-	build_line      = regexp.MustCompile("(.*?):(\\d*(:\\d*)?): (.*)")
-	go_file_postfix = []byte(".go")
+	build_line           = regexp.MustCompile("(.*?):(\\d*(:\\d*)?): (.*)")
+	go_file_postfix      = []byte(".go")
+	expected_declaration = regexp.MustCompile(`found 'IDENT' (\w*)`)
 )
 
 func (ws *GoWorkspace) findPackageFromDirectory(dir string) (string, error) {
@@ -269,6 +273,17 @@ func (ws *GoWorkspace) parseBuildTypedOutput(base string, output string, etype B
 	return res
 }
 
+func (ws *GoWorkspace) findRemotePackagesWithName(name string, ignore map[string]bool) (results Godoc_results) {
+	resp, err := http.Get(fmt.Sprintf("%s/search?q=%s", godoc_org, name))
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	dec := json.NewDecoder(resp.Body)
+	dec.Decode(&results)
+	return results
+}
+
 func (ws *GoWorkspace) findPackagesWithName(name string, ignore map[string]bool) (res []string) {
 	for _, v := range ws.SystemPackages {
 		pname := v.Name
@@ -276,7 +291,8 @@ func (ws *GoWorkspace) findPackagesWithName(name string, ignore map[string]bool)
 		if _, ok := ignore[importpath]; ok {
 			continue
 		}
-		if bytes.Equal([]byte(name), []byte(pname)) {
+		//if bytes.Equal([]byte(name), []byte(pname)) {
+		if strings.Contains(pname, name) {
 			res = append(res, importpath)
 		}
 	}
@@ -286,7 +302,8 @@ func (ws *GoWorkspace) findPackagesWithName(name string, ignore map[string]bool)
 		if _, ok := ignore[importpath]; ok {
 			continue
 		}
-		if bytes.Equal([]byte(name), []byte(pname)) {
+		//if bytes.Equal([]byte(name), []byte(pname)) {
+		if strings.Contains(pname, name) {
 			res = append(res, importpath)
 		}
 	}
@@ -309,11 +326,18 @@ func (ws *GoWorkspace) findImportsInCode(source string) (res map[string]bool, er
 	return
 }
 
-func (ws *GoWorkspace) findUnresolvedAt(source string, pos int) (tok string, err error) {
+func (ws *GoWorkspace) findUnresolvedAt(source string, pos, row, col int) (tok string, err error) {
 	fset := token.NewFileSet()
 
 	f, err := parser.ParseFile(fset, "source.go", source, parser.DeclarationErrors)
 	if err != nil {
+		if strings.HasPrefix(err.Error(), fmt.Sprintf("source.go:%d", row+1)) {
+			subm := expected_declaration.FindStringSubmatch(err.Error())
+			if subm != nil {
+				tok = subm[1]
+				err = nil
+			}
+		}
 		return
 	}
 

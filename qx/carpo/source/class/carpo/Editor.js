@@ -10,7 +10,7 @@ qx.Class.define("carpo.Editor",
         mode: { init: null },
         config: { init: null, nullable:true }
     },
-    construct : function(filepath, filename, content, mode, config, workspace) {
+    construct : function(filepath, filename, content, mode, config, workspace, app) {
         this.base(arguments, filename);
         this.setLayout(new qx.ui.layout.VBox(0));
         this.setFilepath(filepath);
@@ -20,6 +20,7 @@ qx.Class.define("carpo.Editor",
         this.setConfig(config);
         this.setShowCloseButton(true);
         this._workspace = workspace;
+        this._application = app;
         this._contextMenuRow = -1;
         this.__editor = new qx.ui.core.Widget();
         this.__editor.addListenerOnce("appear", function() {
@@ -129,6 +130,9 @@ qx.Class.define("carpo.Editor",
             this.__annotations = annos;
           }
         },
+        getAceEditor : function () {
+          return this.__ace;
+        },
         refreshEditor : function () {
           var ace = this.__ace;
           if (ace)
@@ -140,12 +144,18 @@ qx.Class.define("carpo.Editor",
             qx.event.Timer.once(function() {
                 var self = this;
                 var container = this.__editor.getContentElement().getDomElement();
-                container.style.font = this._fontFromConfig();
-        
                 // create the editor
                 var editor = this.__ace = ace.edit(container);
                 editor.setTheme("ace/theme/eclipse");
-                
+                editor.commands.addCommand({
+                  name: "addPackcage",
+                  bindKey: {win: "Ctrl-Shift-M", mac: "Command-Option-Shift-M"},
+                  exec: function(editor) {
+                    self._application.addImport();
+                  }
+                });
+                container.style.font = this._fontFromConfig();
+
                 var completer = ace.require("ace/ext/language_tools");
                 var goCompleter = {
                   getCompletions: function(compEdit, compSession, pos, prefix, callback) {
@@ -162,9 +172,24 @@ qx.Class.define("carpo.Editor",
                             return {
                               caption:s.nice, 
                               value:s.name, 
+                              meta:s.meta,
                               completer : {
                                 insertMatch:function(ed) {
                                   new carpo.Go(ed.getValue()).addImport(ed, s.name);
+                                }
+                              }
+                            };
+                          }
+                          if (s.type === "install") {
+                            return {
+                              caption:s.nice, 
+                              value:s.name, 
+                              meta:s.meta,
+                              completer : {
+                                insertMatch:function(ed) {
+                                  self._workspace.installPackage(s.name, function () {
+                                    new carpo.Go(ed.getValue()).addImport(ed, s.name);
+                                  });
                                 }
                               }
                             };

@@ -42,6 +42,7 @@ type Suggestion struct {
 	Name  string `json:"name"`
 	Type  string `json:"type"`
 	Nice  string `json:"nice"`
+	Meta  string `json:"meta"`
 }
 
 type GoPackage struct {
@@ -68,6 +69,15 @@ type GoWorkspace struct {
 	testdependencies map[string][]string
 	gobinpath        string
 	gocode           *os.Process
+}
+
+type Godoc_result_entity struct {
+	Path     string `json:"path"`
+	Synopsis string `json:"synopsis"`
+}
+
+type Godoc_results struct {
+	Results []Godoc_result_entity `json:"results"`
 }
 
 func NewGoWorkspace(gobin string, gopath []string, gocode *string) *GoWorkspace {
@@ -228,7 +238,22 @@ func (ws *GoWorkspace) InstallGocode(plugindir string) (gocodebinpath *string, e
 	return
 }
 
-func (ws *GoWorkspace) Autocomplete(gocodebin *string, content string, path string, position int, appengine bool) (sug []Suggestion, err error) {
+func (ws *GoWorkspace) QueryPackages() (res Godoc_results) {
+	for _, p := range ws.SystemPackages {
+		res.Results = append(res.Results, Godoc_result_entity{Path: p.ImportPath, Synopsis: ""})
+	}
+	for _, p := range ws.Packages {
+		res.Results = append(res.Results, Godoc_result_entity{Path: p.ImportPath, Synopsis: ""})
+	}
+	return
+}
+
+func (ws *GoWorkspace) QueryRemotePackages(q string) Godoc_results {
+	m := make(map[string]bool)
+	return ws.findRemotePackagesWithName(q, m)
+}
+
+func (ws *GoWorkspace) Autocomplete(gocodebin *string, content string, path string, position int, row, col int, appengine bool) (sug []Suggestion, err error) {
 	cmd := exec.Command(*gocodebin, "-f=json", "autocomplete", path, fmt.Sprintf("%d", position))
 	goarch := ws.context.GOARCH
 	if appengine {
@@ -257,6 +282,7 @@ func (ws *GoWorkspace) Autocomplete(gocodebin *string, content string, path stri
 	stdin.Close()
 	out, err := ioutil.ReadAll(stdout)
 	if err != nil {
+		log.Printf("Error reading from stdout: %s", err)
 		return
 	}
 	cmd.Wait()
@@ -270,14 +296,21 @@ func (ws *GoWorkspace) Autocomplete(gocodebin *string, content string, path stri
 	if err != nil {
 		ignore = make(map[string]bool)
 	}
-	unres, err2 := ws.findUnresolvedAt(content, position)
+	unres, err2 := ws.findUnresolvedAt(content, position, row, col)
 	if err2 == nil {
 		packs := ws.findPackagesWithName(unres, ignore)
 		for _, pack := range packs {
 			nice := fmt.Sprintf("Import '%s'", pack)
-			sug = append(sug, Suggestion{"import", pack, "import", nice})
+			sug = append(sug, Suggestion{"import", pack, "import", nice, "Local Package"})
+		}
+		godocpacks := ws.findRemotePackagesWithName(unres, ignore)
+		for _, pack := range godocpacks.Results {
+			nice := fmt.Sprintf("Install '%s'", pack.Path)
+			sug = append(sug, Suggestion{"install", pack.Path, "install", nice, "Remote Package"})
 		}
 		sug = append(sug, Suggestion{})
+	} else {
+		log.Printf("cannot find unresolved: %s", err2)
 	}
 	if len(found) > 0 {
 		// first element is the number of matching chars --> ignore it
@@ -289,13 +322,14 @@ func (ws *GoWorkspace) Autocomplete(gocodebin *string, content string, path stri
 				name := suggest["name"].(string)
 				tp := suggest["type"].(string)
 				nice := fmt.Sprintf("%s : %s", name, tp)
+				meta := ""
 				if bytes.Equal([]byte("package"), []byte(class)) {
 					nice = name
 				}
 				if strings.HasPrefix(tp, class) {
 					nice = fmt.Sprintf("%s%s", name, tp[len(class):])
 				}
-				sug = append(sug, Suggestion{class, name, tp, nice})
+				sug = append(sug, Suggestion{class, name, tp, nice, meta})
 			}
 		}
 	}

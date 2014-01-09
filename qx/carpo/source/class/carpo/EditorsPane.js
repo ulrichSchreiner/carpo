@@ -81,6 +81,7 @@ qx.Class.define("carpo.EditorsPane",
       this._application = app;
       this._workspace = workspace;
       this.__silent = false;
+
       app.addListener("configChanged", this._configChanged, this);
       this.addListener ("changeSelection", function (evt) {        
         var editors = this.getSelection();
@@ -166,7 +167,7 @@ qx.Class.define("carpo.EditorsPane",
           if (ed) {
               return ed;
           } else {
-              var page = new carpo.Editor(path, title, content, filemode, this._config, this._workspace);
+              var page = new carpo.Editor(path, title, content, filemode, this._config, this._workspace, this._application);
               page.addListener ("close", function (evt) {
                   this.editorClosed (evt.getTarget());
               }, this);
