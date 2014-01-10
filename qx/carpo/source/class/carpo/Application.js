@@ -52,6 +52,7 @@ qx.Class.define("carpo.Application",
             qx.log.appender.Console;
         }
         this.workspace = new carpo.Workspace(this);
+        this.debugger = new carpo.Debugger(this);
         carpo.EditorsPane.loadAce(qx.lang.Function.bind(this.init, this));
     },
 
@@ -272,11 +273,13 @@ qx.Class.define("carpo.Application",
             // config data is a pure string ...
             app._configuration = qx.lang.Json.parse(data);
             app._generateDefaultConfig(app._configuration);
+            app.debugger.setConfig(app._configuration);
             cb(app._configuration);
             app.fireDataEvent("configChanged", app._configuration);
         }, function () {
             app._configuration = {};
             app._generateDefaultConfig(app._configuration);
+            app.debugger.setConfig(app._configuration);
             cb(app._configuration);
             app.fireDataEvent("configChanged", app._configuration);
         });
@@ -299,6 +302,10 @@ qx.Class.define("carpo.Application",
         }
         if (!config.markers) {
           config.markers = [];
+        }
+        if (!config.debugger) config.debugger={};
+        if (!config.debugger.breakpoints) {
+          config.debugger.breakpoints = {};
         }
     },
     setConfigValue : function (key, val) {
@@ -760,6 +767,9 @@ qx.Class.define("carpo.Application",
       var self = this;
       service.connect = function() {
         var pid = "";
+        var debugSession = null;
+        var debugConsoleId = null;
+        
         if(service.ws) { return; }
         var ws = self.getWebsocket(launchtype, launch);
         
@@ -770,6 +780,8 @@ qx.Class.define("carpo.Application",
         ws.onclose = function (e) {
           model.setPid("");    
           model.setName(model.getDefaultname()+" [STOPPED]");
+          debugSession.removeListenerById(debugConsoleId);
+          self.debugger.removeSession(debugSession);
         };
   
         ws.onmessage = function(e) {
@@ -779,9 +791,16 @@ qx.Class.define("carpo.Application",
             if (pid[pid.length-1] == "\n") {
               model.setPid(pid.trim());    
               model.setName(model.getDefaultname()+" ["+model.getPid()+"]");
+              debugSession = self.debugger.addSession(model.getPid());
+              debugConsoleId = debugSession.addListener("consoleOutput", function (e) {
+                var dat = e.getData();
+                console.log("consoleoutput: ", dat);
+                model.setOutput(model.getOutput()+dat.line);
+              });
             }
           } else {
-            model.setOutput(model.getOutput()+e.data);
+            console.log("debug-message:",e.data);
+            debugSession.message(e.data);
           }
         };
   
@@ -862,7 +881,7 @@ qx.Class.define("carpo.Application",
       });
 
       var head = new qx.ui.basic.Atom(title);
-      head.setDecorator("main");
+      head.setDecorator("window-caption");
       popup.add(head);
       var filter = new qx.ui.form.TextField();
       popup.add(filter);
@@ -903,7 +922,7 @@ qx.Class.define("carpo.Application",
       }, this);
       if (withdesc) {
         var desc = new qx.ui.basic.Atom("<i>... Description ...</i>");
-        desc.setDecorator("main");
+        desc.setDecorator("inset");
         desc.setRich(true);
         popup.add(desc);
         list.getSelection().addListener("change", function (e) {

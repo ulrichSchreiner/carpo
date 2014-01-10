@@ -303,10 +303,13 @@ func (ws *GoWorkspace) Autocomplete(gocodebin *string, content string, path stri
 			nice := fmt.Sprintf("Import '%s'", pack)
 			sug = append(sug, Suggestion{"import", pack, "import", nice, "Local Package"})
 		}
-		godocpacks := ws.findRemotePackagesWithName(unres, ignore)
-		for _, pack := range godocpacks.Results {
-			nice := fmt.Sprintf("Install '%s'", pack.Path)
-			sug = append(sug, Suggestion{"install", pack.Path, "install", nice, "Remote Package"})
+		if len(packs) == 0 {
+			// no local packages found, search for something to install ...
+			godocpacks := ws.findRemotePackagesWithName(unres, ignore)
+			for _, pack := range godocpacks.Results {
+				nice := fmt.Sprintf("Install '%s'", pack.Path)
+				sug = append(sug, Suggestion{"install", pack.Path, "install", nice, "Remote Package"})
+			}
 		}
 		sug = append(sug, Suggestion{})
 	} else {

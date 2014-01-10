@@ -2,11 +2,37 @@ package workspace
 
 import (
 	"code.google.com/p/go.net/websocket"
+	"encoding/json"
 	"fmt"
+	"github.com/ulrichSchreiner/gdbmi"
 	"io"
 	"log"
 	"strings"
 )
+
+type debugEvent string
+
+const (
+	ev_console debugEvent = "console"
+	ev_async              = "async"
+)
+
+type message struct {
+	DebuggerEvent debugEvent                   `json:"debuggerEvent"`
+	Console       *gdbmi.GDBTargetConsoleEvent `json:"console"`
+	Event         *gdbmi.GDBEvent              `json:"event"`
+}
+
+func (ws *workspace) debug(lc *launchConfig) (*gdbmi.GDB, error) {
+	gdb := gdbmi.NewGDB("gdb")
+	if err := gdb.Start(lc.executable); err != nil {
+		return nil, err
+	}
+	//cmd := exec.Command(lc.executable, lc.parameters...)
+	//cmd.Dir = lc.workingDirectory
+	//cmd.Env = lc.environment
+	return gdb, nil
+}
 
 func debugProcessHandler(wks *workspace) websocket.Handler {
 	return func(ws *websocket.Conn) {
@@ -17,42 +43,50 @@ func debugProcessHandler(wks *workspace) websocket.Handler {
 		if err != nil {
 			log.Printf("Error in debugProcessHandler: %v", err)
 		} else {
-			cmd := wks.launch(lc)
-			stdout, err := cmd.StdoutPipe()
+			gdb, err := wks.debug(lc)
 			if err != nil {
-				log.Printf("Error no StdoutPipe: %s", err)
+				log.Printf("Error starting gdb: %s", err)
 				return
 			}
-			stderr, err := cmd.StderrPipe()
-			if err != nil {
-				log.Printf("Error no StderrPipe: %s", err)
-				return
+			wks.putProcess(gdb.DebuggerProcess)
+			io.WriteString(ws, fmt.Sprintf("%d\n", gdb.DebuggerProcess.Pid))
+			_, err = gdb.Exec_run(false, nil)
+			if err == nil {
+				enc := json.NewEncoder(ws)
+				go func() {
+					for {
+						select {
+						case tev := <-gdb.Target:
+							if err = enc.Encode(targetConsoleMessage(&tev)); err != nil {
+								log.Printf("cannot json-encode message: %s (%+v)", err, tev)
+							}
+						case ev := <-gdb.Event:
+							log.Printf("received: %+v", ev)
+							if ev.StopReason == gdbmi.Async_stopped_exited ||
+								ev.StopReason == gdbmi.Async_stopped_exited_normally ||
+								ev.StopReason == gdbmi.Async_stopped_exited_signalled {
+								log.Printf("exit received: %+v", ev)
+								gdb.Gdb_exit()
+								return
+							} else {
+							}
+						}
+					}
+				}()
 			}
-			stdin, err := cmd.StdinPipe()
-			if err != nil {
-				log.Printf("Error no StdinPipe: %s", err)
-				return
-			}
-			if err := cmd.Start(); err != nil {
-				log.Printf("Error when starting process: %s", err)
-				return
-			}
-			wks.putProcess(cmd.Process)
-			io.WriteString(ws, fmt.Sprintf("%d\n", cmd.Process.Pid))
-			go func() {
-				io.Copy(ws, stdout)
-			}()
-			go func() {
-				io.Copy(ws, stderr)
-			}()
-			go func() {
-				io.Copy(stdin, ws)
-			}()
-			if err := cmd.Wait(); err != nil {
+			if _, err = gdb.DebuggerProcess.Wait(); err != nil {
 				log.Printf("Error waiting for process: %s", err)
 			}
-			wks.removeProcess(cmd.Process)
+			wks.removeProcess(gdb.DebuggerProcess)
 			log.Printf("LC '%+v' ended", lc)
 		}
 	}
+}
+
+func targetConsoleMessage(ev *gdbmi.GDBTargetConsoleEvent) message {
+	return message{ev_console, ev, nil}
+}
+
+func eventMessage(ev *gdbmi.GDBEvent) message {
+	return message{ev_async, nil, ev}
 }

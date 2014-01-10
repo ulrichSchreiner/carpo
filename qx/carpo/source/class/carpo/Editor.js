@@ -35,7 +35,7 @@ qx.Class.define("carpo.Editor",
           if (!this.gutterContextMenu) {
             var menu = new qx.ui.menu.Menu();
             var toggleBP = new qx.ui.menu.Button("Toggle Breakpoint");
-            toggleBP.addListener("execute", this.addBreakpoint, this);
+            toggleBP.addListener("execute", this.toggleBreakpoint, this);
             var addMarker = new qx.ui.menu.Button("Add Marker");
             addMarker.addListener("execute", this.addMarker, this);
             menu.add(toggleBP);
@@ -58,14 +58,17 @@ qx.Class.define("carpo.Editor",
         },
         addMarker : function (e) {
         },
-        addBreakpoint : function (e) {
+        toggleBreakpoint : function (e) {
           var row = this._contextMenuRow;
           var session = this.__ace.session;
           
           var bp = session.getBreakpoints()[row];
           bp = bp ? "" : " ace_breakpoint ";
-
           session.setBreakpoint(row, bp) ;
+          if (bp) 
+            this._application.debugger.addBreakpoint(this.getFilepath(), row);
+          else
+            this._application.debugger.removeBreakpoint(this.getFilepath(), row);
         },
         focus : function () {
           if (this.__ace)
