@@ -44,6 +44,7 @@ qx.Class.define("carpo.FileBrowser", {
         label: "Root",
         path : "/",
         children: [],
+        filesystem : "",
         loaded:false
       };
       var model = qx.data.marshal.Json.createModel(root, true);
@@ -91,9 +92,11 @@ qx.Class.define("carpo.FileBrowser", {
         if (!this.syncButton.getValue()) return;
         this._selectNode(path);
       },
-      _selectNode : function (path) {
+      _selectNode : function (fpath) {
         this._refreshLock = true;
         var self = this;
+        var path = "/"+fpath.fs+fpath.path;
+        //var fs = fpath.fs;
         this._findNodesByPath(this.model, path.split("/").slice(1), function(mod) {
           self.tree.openNodeAndParents(mod);
           self.tree.getSelection().push(mod);
@@ -198,21 +201,27 @@ qx.Class.define("carpo.FileBrowser", {
     
       loadContent : function (path, parnode, cb) {
         parnode.getChildren().removeAll();
-        this._workspace.dir(path, function (data) {
-          data.entries.sort(function (a,b) {
-            if (a.dir && !b.dir) return -1;
-            if (!a.dir && b.dir) return 1;
-            var ta=a.name.toLowerCase(); 
-            var tb=b.name.toLowerCase(); 
-            return ta===tb?0:(ta<tb?-1:1);
-          })
-          data.entries.forEach (function (e) {
-            if (e.dir) {
-              parnode.getChildren().push(qx.data.marshal.Json.createModel({ dir:true, label:e.name, path:path+e.name+"/",children:[]}, true));
-            } else {
-              parnode.getChildren().push(qx.data.marshal.Json.createModel({ dir:false, label:e.name, path:path+e.name}, true));
-            }
-          });
+        this._workspace.dir(parnode.getFilesystem(), path, function (data) {
+          if (parnode.getFilesystem() !== "") {
+            data.entries.sort(function (a,b) {
+              if (a.dir && !b.dir) return -1;
+              if (!a.dir && b.dir) return 1;
+              var ta=a.name.toLowerCase(); 
+              var tb=b.name.toLowerCase(); 
+              return ta===tb?0:(ta<tb?-1:1);
+            });
+            data.entries.forEach (function (e) {
+              if (e.dir) {
+                parnode.getChildren().push(qx.data.marshal.Json.createModel({ filesystem:e.filesystem, dir:true, label:e.name, path:path+e.name+"/",children:[]}, true));
+              } else {
+                parnode.getChildren().push(qx.data.marshal.Json.createModel({ filesystem:e.filesystem, dir:false, label:e.name, path:path+e.name}, true));
+              }
+            });
+          } else {
+            data.entries.forEach (function (e) {
+              parnode.getChildren().push(qx.data.marshal.Json.createModel({ filesystem:e.filesystem, dir:true, label:e.name, path:path,children:[]}, true));
+            });
+          }
           if (cb) {
             cb(parnode);
           }
@@ -237,8 +246,8 @@ qx.Class.define("carpo.FileBrowser", {
         var self = this;
         if (node) {
           var pt = node.getPath();
-          if (confirm("Do you really want to delete '"+node.getPath()+"'?")) {
-            self._workspace.rm(pt, function (cb) {
+          if (confirm("Do you really want to delete '"+node.getFilesystem()+node.getPath()+"'?")) {
+            self._workspace.rm(node.getFilesystem(), pt, function (cb) {
               self.removeItem(self.model, node);
             });
           }
@@ -253,7 +262,7 @@ qx.Class.define("carpo.FileBrowser", {
             var pt = node.getPath();
             this._application.createModalTextInputDialog("Create Folder", "Create a new folder in '"+pt+"'", function (filename) {
               var path = pt+"/"+filename;
-              self._workspace.createdir(path, function (cb) {
+              self._workspace.createdir(node.getFilesystem(), path, function (cb) {
                  self.loadContent(pt, node, null);
               });
             });
@@ -269,7 +278,7 @@ qx.Class.define("carpo.FileBrowser", {
             var pt = node.getPath();
             this._application.createModalTextInputDialog("Create File", "Create a new file in '"+pt+"'", function (filename) {
               var path = pt+"/"+filename;
-              self._workspace.createfile(path, function (cb) {
+              self._workspace.createfile(node.getFilesystem(), path, function (cb) {
                 self.loadContent(pt, node, null);
               });
             });

@@ -76,7 +76,7 @@ qx.Class.define("carpo.Application",
             allowGrowX: true
         });
         this.compileroutputModel = new qx.ui.table.model.Simple();
-        var columns = [ "","Source", "Line", "Column","Message" ];
+        var columns = [ "","Project","Source", "Line", "Column","Message" ];
         this.compileroutputModel.setColumns(columns);
         var custom = {
             tableColumnModel : function(obj) {
@@ -96,17 +96,18 @@ qx.Class.define("carpo.Application",
         this.compileroutput.addListener("cellDblclick", function (e) {
             var row = e.getRow();
             var data = this.compileroutputModel.getRowData(row);
-            this.showError (data[1], data[2], data[3], data[4]);
+            this.showError (data[1], data[2], data[3], data[4], data[5]);
         }, this);
         var tcm = this.compileroutput.getTableColumnModel();
       
         var resizeBehavior = tcm.getBehavior();
 
-        resizeBehavior.setWidth(0, "5%");
-        resizeBehavior.setWidth(1, "20%");
-        resizeBehavior.setWidth(2, "5%");
-        resizeBehavior.setWidth(3, "5%");
-        resizeBehavior.setWidth(4, "65%");
+        resizeBehavior.setWidth(0, "2%");
+        resizeBehavior.setWidth(1, "5%");
+        resizeBehavior.setWidth(2, "20%");
+        resizeBehavior.setWidth(3, "4%");
+        resizeBehavior.setWidth(4, "4%");
+        resizeBehavior.setWidth(5, "65%");
 
         var renderer = new qx.ui.table.cellrenderer.Image();
         this.compileroutput.getTableColumnModel().setDataCellRenderer(0, renderer);
@@ -120,15 +121,17 @@ qx.Class.define("carpo.Application",
         fb.addListener ("openFile", function (e) {
           var path = e.getData().getPath();
           var lbl = e.getData().getLabel();
-          this.workspace.loadFile (path, function (data) {
-              app.editors.openEditor(path, lbl, data.content, data.filemode);     
+          var fs = e.getData().getFilesystem();
+          this.workspace.loadFile (fs, path, function (data) {
+              app.editors.openEditor(fs, path, lbl, data.content, data.filemode);     
               app.showAnnotations();
           });          
         }, this);
 
         this.editors.addListener ("fileSelected", function(e) {
           var path = e.getData().path;
-          fb.selectNode(path);
+          var fs = e.getData().filesystem;
+          fb.selectNode({path:path,fs:fs});
         }, this);
 
         var output = new qx.ui.tabview.TabView();
@@ -262,8 +265,9 @@ qx.Class.define("carpo.Application",
       this.ignoredPackagesModel.setData(d);      
     },
     currentSelectedEditorPath : function () {
-      if (this.editors.getCurrentEditor())
-        return this.editors.getCurrentEditor().getFilepath();
+      var ed = this.editors.getCurrentEditor();
+      if (ed)
+        return {path: ed.getFilepath(), fs: ed.getFilesystem()};
       return null;
     },
     
@@ -563,7 +567,7 @@ qx.Class.define("carpo.Application",
             var app = this;
             var data = editor.getEditorData();
             data.build = true;
-            this.workspace.saveFile(data.path, data, function (rsp) {
+            this.workspace.saveFile(data.filesystem, data.path, data, function (rsp) {
               editor.setEditorValue(rsp.formattedcontent, true);
               if (rsp.buildtype && rsp.buildtype == "golang")
                 app.showBuildResult(rsp);
@@ -581,7 +585,7 @@ qx.Class.define("carpo.Application",
           var app = this;
           var data = editor.getEditorData();
           data.build = false;
-          this.workspace.saveFile(data.path, data, qx.lang.Function.bind(cb, editor));
+          this.workspace.saveFile(data.filesystem, data.path, data, qx.lang.Function.bind(cb, editor));
         }
       }
     },
@@ -638,7 +642,7 @@ qx.Class.define("carpo.Application",
               url = "icon/16/status/dialog-warning.png";
               hasWarning = true;
             }
-            data.push([url,o.file,o.line,o.column, o.message,null,null,null,null,o]); 
+            data.push([url,o.filesystem, o.file,o.line,o.column, o.message,null,null,null,o]); 
           });
         } else {
           this.currentBuildoutput = null;
@@ -657,12 +661,12 @@ qx.Class.define("carpo.Application",
       var markers = this.getConfig().markers;
       this.editors.showAnnotations(this.currentBuildoutput || [], markers);
     },
-    showError : function (src, line, column, message) {
+    showError : function (fs, src, line, column, message) {
         var app = this;
-        var editor = this.editors.getEditorFor(src);
+        var editor = this.editors.getEditorFor(fs, src);
         if (!editor) {
-            this.workspace.loadFile (src, function (data) {
-                var editor = app.editors.openEditor(src, data.title, data.content, data.filemode);
+            this.workspace.loadFile (fs, src, function (data) {
+                var editor = app.editors.openEditor(fs, src, data.title, data.content, data.filemode);
                 editor.jumpTo(line, column);
                 app.showAnnotations();
             });  
@@ -740,9 +744,43 @@ qx.Class.define("carpo.Application",
       service.launchconfig = launch;
       service.pid = null;
       service.output = "";
+      service.defaultname = launch.name;
       service.name = launch.name;
-      
-      return this._launchProcess("launch", launch, service);
+      var model = qx.data.marshal.Json.createModel(service);
+      var self = this;
+      service.connect = function() {
+        var pid = "";
+
+        if(service.ws) { return; }
+        var ws = self.getWebsocket("launch", launch);
+        
+        ws.onopen = function(e) { };
+  
+        ws.onerror = function(e) { console.log("on error"); };
+        
+        ws.onclose = function (e) {
+          model.setPid("");    
+          model.setName(model.getDefaultname()+" [STOPPED]");
+        };
+  
+        ws.onmessage = function(e) {
+          var data = e.data;
+          if (!model.getPid()) {
+            pid = pid + data;
+            if (pid[pid.length-1] == "\n") {
+              model.setPid(pid.trim());    
+              model.setName(model.getDefaultname()+" ["+model.getPid()+"]");
+            }
+          } else {
+            model.setOutput(model.getOutput()+e.data);
+          }
+        };
+  
+        service.ws = ws;
+      };
+      this.processes.push(model);
+      this.processList.setModelSelection([model]);
+      return service;
     },
     debugProcess : function (launch) {
       var service = {};
@@ -752,18 +790,7 @@ qx.Class.define("carpo.Application",
       service.defaultname = "DEBUG: "+launch.name;
       service.name = launch.name;
 
-      return this._launchProcess("debug", launch, service);
-    },
-    getWebsocket : function (launchtype, launch) {
-      var h = window.location.hostname;
-      var p = window.location.port;
-      var prot = window.location.protocol=="http:" ? "ws://" : "wss://";
-      return new WebSocket(prot+h+":"+p+"/"+launchtype+"/"+launch.id);
-    },
-    
-    _launchProcess : function (launchtype, launch, service) {
       var model = qx.data.marshal.Json.createModel(service);
-      
       var self = this;
       service.connect = function() {
         var pid = "";
@@ -771,7 +798,7 @@ qx.Class.define("carpo.Application",
         var debugConsoleId = null;
         
         if(service.ws) { return; }
-        var ws = self.getWebsocket(launchtype, launch);
+        var ws = self.getWebsocket("debug", launch);
         
         ws.onopen = function(e) { };
   
@@ -810,6 +837,13 @@ qx.Class.define("carpo.Application",
       this.processList.setModelSelection([model]);
       return service;
     },
+    getWebsocket : function (launchtype, launch) {
+      var h = window.location.hostname;
+      var p = window.location.port;
+      var prot = window.location.protocol=="http:" ? "ws://" : "wss://";
+      return new WebSocket(prot+h+":"+p+"/"+launchtype+"/"+launch.id);
+    },
+    
     installGocode : function (evt) {
       var app = this;
       this.workspace.installgocode (function (env) {

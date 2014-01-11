@@ -36,9 +36,10 @@ qx.Class.define("carpo.Workspace",
       var d = this.__getresource("install","GET","/workspace/install/package", cb);
       d.install({},"pkg="+pkg);
     },
-    dir : function (pt, cb) {
-      var d = this.__getresource("dir","GET","/workspace/dir", cb);
-      d.dir({},"path="+pt);
+    dir : function (fs,pt, cb) {
+      var d = this.__getresource("dir","POST","/workspace/dir", cb);
+      var data = {filesystem:fs,path:pt}
+      d.dir({},data);
     },
     
     loadconfig : function (cb,errcb) {
@@ -55,13 +56,15 @@ qx.Class.define("carpo.Workspace",
       d.saveconfig({}, data);          
     },
     
-    loadFile : function (pt, cb) {
-        var d  =this.__getresource("loadFile","GET","/workspace/file", cb);
-        d.loadFile({},"path="+pt);
+    loadFile : function (fs, pt, cb) {
+        var d  =this.__getresource("loadFile","POST","/workspace/readfile", cb);
+        var data = {filesystem:fs, path:pt};
+        d.loadFile({},data);
     },
     
-    saveFile : function (pt, data, cb) {
-        var d  =this.__getresource("saveFile","POST","/workspace/file", cb);
+    saveFile : function (fs, pt, data, cb) {
+        var d  =this.__getresource("saveFile","POST","/workspace/savefile", cb);
+        data.filesystem = fs;
         d.saveFile({}, data);
     },
     
@@ -69,17 +72,20 @@ qx.Class.define("carpo.Workspace",
         var d = this.__getresource("build","POST","/workspace/build", cb);
         d.build({}, cfg);
     },
-    createdir : function (pt, cb) {
-      var d = this.__getresource("createdir","GET","/workspace/mkdir", cb);
-      d.createdir({},"path="+pt);
+    createdir : function (fs, pt, cb) {
+      var d = this.__getresource("createdir","POST","/workspace/mkdir", cb);
+      var data = {filesystem:fs, path:pt};
+      d.createdir({},data);
     },
-    createfile : function (pt, cb) {
-      var d = this.__getresource("createfile","GET","/workspace/touch", cb);
-      d.createfile({},"path="+pt);
+    createfile : function (fs, pt, cb) {
+      var d = this.__getresource("createfile","POST","/workspace/touch", cb);
+      var data = {filesystem:fs, path:pt};
+      d.createfile({},data);
     },
-    rm : function (pt, cb) {
-      var d = this.__getresource("rm","GET","/workspace/rm", cb);
-      d.rm({},"path="+pt);
+    rm : function (fs, pt, cb) {
+      var d = this.__getresource("rm","POST","/workspace/rm", cb);
+      var data = {filesystem:fs, path:pt};
+      d.rm({},data);
     },
     exit : function (cb) {
       var d = this.__getresource("exit","GET","/workspace/exit", cb);

@@ -10,6 +10,7 @@ import (
 	"github.com/howeyc/fsnotify"
 	_ "github.com/ulrichSchreiner/carpo/golang"
 	"github.com/ulrichSchreiner/carpo/workspace/builder"
+	"github.com/ulrichSchreiner/carpo/workspace/filesystem"
 	"go/format"
 	"io"
 	"io/ioutil"
@@ -41,12 +42,12 @@ func (w *workspace) register(container *restful.Container) {
 		Path("/workspace").
 		Consumes(restful.MIME_JSON).
 		Produces(restful.MIME_JSON)
-	ws.Route(ws.GET("/dir").To(w.dir).Writes(dir{}))
-	ws.Route(ws.GET("/mkdir").To(w.createdir).Writes(dir{}))
-	ws.Route(ws.GET("/touch").To(w.touch).Writes(dir{}))
-	ws.Route(ws.GET("/rm").To(w.rmfile).Writes(dir{}))
-	ws.Route(ws.GET("/file").To(w.file).Writes(fileContent{}))
-	ws.Route(ws.POST("/file").To(w.save).Reads(fileSaveRequest{}).Writes(fileSaveResponse{}))
+	ws.Route(ws.POST("/dir").To(w.dir).Reads(dirRequest{}).Writes(dir{}))
+	ws.Route(ws.POST("/mkdir").To(w.createdir).Reads(dirRequest{}).Writes(dir{}))
+	ws.Route(ws.POST("/touch").To(w.touch).Reads(fileReadRequest{}).Writes(dir{}))
+	ws.Route(ws.POST("/rm").To(w.rmfile).Reads(dirRequest{}).Writes(dir{}))
+	ws.Route(ws.POST("/readfile").To(w.file).Reads(fileReadRequest{}).Writes(fileContent{}))
+	ws.Route(ws.POST("/savefile").To(w.save).Reads(fileSaveRequest{}).Writes(fileSaveResponse{}))
 	ws.Route(ws.POST("/config").To(w.saveConfig))
 	ws.Route(ws.GET("/config").To(w.loadConfig))
 	ws.Route(ws.GET("/environment").To(w.loadEnvironment))
@@ -90,14 +91,20 @@ type (
 
 type (
 	dirEntry struct {
-		Name  string `json:"name"`
-		IsDir bool   `json:"dir"`
+		Filesystem string `json:"filesystem"`
+		Name       string `json:"name"`
+		IsDir      bool   `json:"dir"`
 	}
 
 	dir struct {
-		Path        string     `json:"path"`
-		PathEntries []string   `json:"pathentries"`
-		Entries     []dirEntry `json:"entries"`
+		Filesystem string     `json:"filesystem"`
+		Path       string     `json:"path"`
+		Entries    []dirEntry `json:"entries"`
+	}
+
+	dirRequest struct {
+		Filesystem string `json:"filesystem"`
+		Path       string `json:"path"`
 	}
 )
 
@@ -113,18 +120,23 @@ type buildRequest struct {
 	Type  buildType `json:"buildtype"`
 }
 
+type fileReadRequest struct {
+	Filesystem string `json:"filesystem"`
+	Path       string `json:"path"`
+}
+
 type fileSaveRequest struct {
 	buildRequest
-	Path    string `json:"path"`
-	Content string `json:"content"`
-	Mode    uint32 `json:"mode"`
+	Filesystem string `json:"filesystem"`
+	Path       string `json:"path"`
+	Content    string `json:"content"`
+	Mode       uint32 `json:"mode"`
 }
 type buildResponse struct {
-	Ok               bool                  `json:"ok"`
-	Message          string                `json:"message"`
-	BuildType        string                `json:"buildtype"`
-	BuiltDirectories []string              `json:"builtDirectories"`
-	BuildOutput      []builder.BuildResult `json:"buildoutput"`
+	Ok          bool                  `json:"ok"`
+	Message     string                `json:"message"`
+	BuildType   string                `json:"buildtype"`
+	BuildOutput []builder.BuildResult `json:"buildoutput"`
 }
 type fileSaveResponse struct {
 	buildResponse
@@ -135,17 +147,14 @@ type WorkspaceConfiguration struct {
 	BaseDirectory string `json:"basedirectory"`
 }
 
-/*
- * Return the absolute part, relative part and an error.
- */
-func (serv *workspace) getPathFromRequest(cpath string) (string, string, error) {
-	path := filepath.Join(serv.Path, "./"+cpath)
-	rpath, err := filepath.Rel(serv.Path, path)
-	if err != nil {
-		return "", "", err
+func (serv *workspace) fs(name string) (filesystem.WorkspaceFS, error) {
+	fs, ok := serv.filesystems[name]
+	if !ok {
+		return nil, fmt.Errorf("unknown filesystem %s", name)
 	}
-	return filepath.Join(serv.Path, rpath), rpath, nil
+	return fs, nil
 }
+
 func (serv *workspace) save(request *restful.Request, response *restful.Response) {
 	rq := new(fileSaveRequest)
 	err := request.ReadEntity(&rq)
@@ -153,36 +162,40 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Request: %s", err))
 		return
 	}
-	path, _, err := serv.getPathFromRequest(rq.Path)
-	if err != nil {
-		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Path: %s", err))
+	fs, ok := serv.filesystems[rq.Filesystem]
+	if !ok {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Unknown filesystem: %s", rq.Filesystem))
 		return
 	}
+	path, rpath, fl, err := filesystem.AbsolutePathWrite(fs, rq.Path)
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal path %s in fs %s: %v", rq.Path, fs.Base(), err))
+		return
+	}
+	defer fl.Close()
 	src, err := format.Source([]byte(rq.Content))
 	if err != nil {
 		src = []byte(rq.Content)
 	}
-
-	err = ioutil.WriteFile(path, src, os.FileMode(rq.Mode))
+	_, err = fl.Write(src)
 	if err != nil {
-		sendError(response, http.StatusBadRequest, fmt.Errorf("Error saving file '%s': %s", path, err))
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Error saving file: %v", err))
 		return
 	}
-	fn := filepath.Base(path)
+	//fn := filepath.Base(path)
 	fp := filepath.Dir(path)
 	//golang.Parse(string(src), fn)
-	fres := fileSaveResponse{buildResponse{true, "File saved", "", []string{}, []builder.BuildResult{}}, string(src)}
+	fres := fileSaveResponse{buildResponse{true, "File saved", "", []builder.BuildResult{}}, string(src)}
 	if rq.Build {
-		if strings.HasSuffix(strings.ToLower(fn), ".go") {
+		if strings.HasSuffix(strings.ToLower(rpath), ".go") {
 			fres.BuildType = BUILD_GOLANG
-			output, dirs, err := serv.goworkspace.BuildPackage(serv.Path, fp)
+			output, _, err := serv.goworkspace.BuildPackage(fs, fp)
 			if err != nil {
 				log.Printf("ERROR: %s\n", err)
 				fres.Message = err.Error()
 				fres.Ok = false
 			} else {
 				fres.BuildOutput = *output
-				fres.BuiltDirectories = *dirs
 			}
 		}
 	}
@@ -202,109 +215,160 @@ func (serv *workspace) findBuilder(tp buildType, userpath string) *string {
 }
 
 func (serv *workspace) file(request *restful.Request, response *restful.Response) {
-	path, rpath, err := serv.getPathFromRequest(request.QueryParameter("path"))
+	rq := new(fileReadRequest)
+	err := request.ReadEntity(&rq)
 	if err != nil {
-		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Path: %s", err))
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Request: %s", err))
 		return
 	}
-	var result fileContent
-	result.Title = filepath.Base(path)
-	f, err := os.Open(path)
-	if err != nil {
-		sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot open content of '%s' parameter: %s", rpath, err))
-	} else {
-		defer f.Close()
-		cnt, err := ioutil.ReadAll(f)
-		if err != nil {
-			sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot read content of '%s' parameter: %s", rpath, err))
-		}
-		fi, err := f.Stat()
-		if err != nil {
-			sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot stat file '%s': %s", rpath, err))
-		}
-		result.Content = string(cnt)
-		result.FileMode = uint32(fi.Mode())
-		response.WriteEntity(&result)
+	fs, ok := serv.filesystems[rq.Filesystem]
+	if !ok {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Unknown filesystem: %s", rq.Filesystem))
+		return
 	}
+	_, rpath, fl, err := filesystem.AbsolutePath(fs, rq.Path)
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal path %s in fs %s: %v", rq.Path, fs.Base(), err))
+		return
+	}
+	defer fl.Close()
+
+	var result fileContent
+	result.Title = filepath.Base(rpath)
+	cnt, err := ioutil.ReadAll(fl)
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot read content of '%s' parameter: %s", rq.Path, err))
+	}
+	fi, err := fs.Stat(rpath)
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot stat file '%s': %s", rq.Path, err))
+	}
+	result.Content = string(cnt)
+	result.FileMode = uint32(fi.Mode())
+	response.WriteEntity(&result)
 }
 
 func (serv *workspace) dir(request *restful.Request, response *restful.Response) {
-	serv.dircontent(request.QueryParameter("path"), request, response)
-}
-
-func (serv *workspace) dircontent(pt string, request *restful.Request, response *restful.Response) {
-	path, rpath, err := serv.getPathFromRequest(pt)
+	rq := new(dirRequest)
+	err := request.ReadEntity(&rq)
 	if err != nil {
-		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Path: %s", err))
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Request: %s", err))
+		return
+	}
+	if len(rq.Filesystem) == 0 {
+		var result dir
+		for _, n := range serv.goworkspace.RootFS() {
+			result.Entries = append(result.Entries, dirEntry{n, n, true})
+		}
+		response.WriteEntity(&result)
 		return
 	}
 
-	var result dir
-	result.Path = rpath
-	if len(rpath) > 0 {
-		result.PathEntries = strings.Split(rpath, string(os.PathSeparator))
-	} else {
-		result.PathEntries = []string{}
+	fs, ok := serv.filesystems[rq.Filesystem]
+	if !ok {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Unknown filesystem: %s", rq.Filesystem))
+		return
 	}
-	f, err := os.Open(path)
+	_, rpath, fl, err := filesystem.AbsolutePath(fs, rq.Path)
 	if err != nil {
-		sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot read '%s' parameter: %s", rpath, err))
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal path %s in fs %s: %v", rq.Path, fs.Base(), err))
+		return
+	}
+	defer fl.Close()
+	serv.dircontent(fs, fl, rpath, request, response)
+}
+
+func (serv *workspace) dircontent(fs filesystem.WorkspaceFS, fl filesystem.WorkspaceFile, path string, request *restful.Request, response *restful.Response) {
+	var result dir
+	flz, err := fl.Readdir(-1)
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot read contents of '%s': %s", path, err))
 	} else {
-		defer f.Close()
-		flz, err := f.Readdir(-1)
-		if err != nil {
-			sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot read contents of '%s': %s", rpath, err))
-		} else {
-			for _, fl := range flz {
-				result.Entries = append(result.Entries, dirEntry{fl.Name(), fl.IsDir()})
-			}
-			response.WriteEntity(&result)
+		for _, fli := range flz {
+			result.Entries = append(result.Entries, dirEntry{fs.Name(), fli.Name(), fli.IsDir()})
 		}
+		response.WriteEntity(&result)
 	}
 }
 func (serv *workspace) rmfile(request *restful.Request, response *restful.Response) {
-	path, rpath, err := serv.getPathFromRequest(request.QueryParameter("path"))
+	rq := new(dirRequest)
+	err := request.ReadEntity(&rq)
 	if err != nil {
-		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Path: %s", err))
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Request: %s", err))
 		return
 	}
-	err = os.RemoveAll(path)
+	fs, ok := serv.filesystems[rq.Filesystem]
+	if !ok {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Unknown filesystem: %s", rq.Filesystem))
+		return
+	}
+
+	path := filepath.Clean(rq.Path)
+	err = fs.RemoveAll(path)
 
 	if err != nil {
 		sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot rm dir: %s", err))
 		return
 	}
-	serv.dircontent(filepath.Join("/", rpath, ".."), request, response)
+	fl, err := fs.Open(filepath.Dir(path), os.O_RDONLY, 0666)
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("cannot open parent dir: %v", err))
+		return
+	}
+	defer fl.Close()
+	serv.dircontent(fs, fl, filepath.Dir(path), request, response)
 }
 
 func (serv *workspace) createdir(request *restful.Request, response *restful.Response) {
-	path, rpath, err := serv.getPathFromRequest(request.QueryParameter("path"))
+	rq := new(dirRequest)
+	err := request.ReadEntity(&rq)
 	if err != nil {
-		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Path: %s", err))
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Request: %s", err))
 		return
 	}
-	err = os.Mkdir(path, 0755)
-
+	fs, ok := serv.filesystems[rq.Filesystem]
+	if !ok {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Unknown filesystem: %s", rq.Filesystem))
+		return
+	}
+	err = fs.Mkdir(rq.Path, 0755)
 	if err != nil {
 		sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot create dir: %s", err))
 		return
 	}
-	serv.dircontent(filepath.Join("/", rpath), request, response)
-}
-func (serv *workspace) touch(request *restful.Request, response *restful.Response) {
-	path, rpath, err := serv.getPathFromRequest(request.QueryParameter("path"))
+	fl, err := fs.Open(rq.Path, os.O_RDONLY, 0666)
 	if err != nil {
-		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Path: %s", err))
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot open created dir: %s", err))
 		return
 	}
-	f, err := os.Create(path)
-	defer f.Close()
-
+	defer fl.Close()
+	serv.dircontent(fs, fl, rq.Path, request, response)
+}
+func (serv *workspace) touch(request *restful.Request, response *restful.Response) {
+	rq := new(fileReadRequest)
+	err := request.ReadEntity(&rq)
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Illegal Request: %s", err))
+		return
+	}
+	fs, ok := serv.filesystems[rq.Filesystem]
+	if !ok {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Unknown filesystem: %s", rq.Filesystem))
+		return
+	}
+	f, err := fs.Create(rq.Path)
 	if err != nil {
 		sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot create file: %s", err))
 		return
 	}
-	serv.dircontent(filepath.Join("/", rpath, ".."), request, response)
+	f.Close()
+	fl, err := fs.Open(filepath.Dir(rq.Path), os.O_RDONLY, 0666)
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("cannot open parent dir: %v", err))
+		return
+	}
+	defer fl.Close()
+	serv.dircontent(fs, fl, filepath.Dir(rq.Path), request, response)
 }
 
 func (serv *workspace) saveConfig(request *restful.Request, response *restful.Response) {
@@ -326,7 +390,7 @@ func (serv *workspace) saveConfig(request *restful.Request, response *restful.Re
 	serv.config = conf.(map[string]interface{})
 	newgo := serv.gobinpath()
 	if bytes.Compare([]byte(*oldgo), []byte(*newgo)) != 0 {
-		gws := builder.NewGoWorkspace(*newgo, []string{serv.Path}, serv.gocode)
+		gws := builder.NewGoWorkspace(*newgo, serv.Path, serv.gocode, serv.filesystems)
 		serv.goworkspace.Shutdown()
 		serv.goworkspace = gws
 	}
@@ -394,7 +458,7 @@ func (serv *workspace) loadConfiguration() {
 }
 
 func (serv *workspace) buildWorkspace(request *restful.Request, response *restful.Response) {
-	result := buildResponse{true, "Full Build", "", []string{}, []builder.BuildResult{}}
+	result := buildResponse{true, "Full Build", "", []builder.BuildResult{}}
 	rq := new(buildRequest)
 	err := request.ReadEntity(&rq)
 	if err != nil {
@@ -408,14 +472,14 @@ func (serv *workspace) buildWorkspace(request *restful.Request, response *restfu
 		}
 	}
 	result.BuildType = BUILD_GOLANG
-	output, dirs, err := serv.goworkspace.FullBuild(serv.Path, ignoredPackages)
+	workspace := serv.goworkspace.WorkspaceFS()
+	output, _, err := serv.goworkspace.FullBuild(workspace, ignoredPackages)
 	if err != nil {
 		log.Printf("Build ERROR: %s\n", err)
 		result.Message = err.Error()
 		result.Ok = false
 	} else {
 		result.BuildOutput = *output
-		result.BuiltDirectories = *dirs
 	}
 
 	response.WriteEntity(&result)
@@ -569,8 +633,9 @@ type workspace struct {
 	goworkspace *builder.GoWorkspace
 	config      map[string]interface{}
 
-	processes map[int]*os.Process
-	proclock  *sync.Mutex
+	processes   map[int]*os.Process
+	proclock    *sync.Mutex
+	filesystems map[string]filesystem.WorkspaceFS
 }
 
 type fileevent struct {
@@ -608,7 +673,7 @@ func NewWorkspace(path string) error {
 		os.Mkdir(filepath.Join(plugindir, "bin"), 0755)
 	}
 
-	w := workspace{path, plugindir, nil, nil, nil, nil, nil, nil, nil, new(sync.Mutex)}
+	w := workspace{path, plugindir, nil, nil, nil, nil, nil, nil, nil, new(sync.Mutex), make(map[string]filesystem.WorkspaceFS)}
 	w.loadConfiguration()
 	w.processes = make(map[int]*os.Process)
 
@@ -636,7 +701,7 @@ func NewWorkspace(path string) error {
 		log.Printf("gocode: %s", *w.gocode)
 	}
 
-	gws := builder.NewGoWorkspace(*gobinpath, []string{path}, w.gocode)
+	gws := builder.NewGoWorkspace(*gobinpath, path, w.gocode, w.filesystems)
 	w.goworkspace = gws
 
 	wsContainer := restful.NewContainer()

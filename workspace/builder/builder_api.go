@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/ulrichSchreiner/carpo/workspace/filesystem"
 	"go/build"
 	"io/ioutil"
 	"log"
@@ -27,6 +28,7 @@ the the source where the problem occured, the line, the column and at least a me
 type BuildResult struct {
 	Type              BuildResultType `json:"type"`
 	Original          string          `json:"original"`
+	Filesystem        string          `json:"filesystem"`
 	File              string          `json:"file"`
 	Directory         string          `json:"directory"`
 	Source            string          `json:"source"`
@@ -57,18 +59,21 @@ type GoWorkspace struct {
 	Packages       map[string]*build.Package
 	SystemPackages map[string]*build.Package
 	Build          []BuildResult
-	Path           string
+	FirstPath      string
 	Workdir        string
 	GoPath         []string
+	GoPathString   string
 
 	// some private data
-	context          build.Context
-	neededBy         map[string][]string
-	dependencies     map[string][]string
-	testneededBy     map[string][]string
-	testdependencies map[string][]string
-	gobinpath        string
-	gocode           *os.Process
+	context            build.Context
+	neededBy           map[string][]string
+	dependencies       map[string][]string
+	testneededBy       map[string][]string
+	testdependencies   map[string][]string
+	gobinpath          string
+	gocode             *os.Process
+	filesystems        map[string]filesystem.WorkspaceFS
+	filesystemsOrdered []filesystem.WorkspaceFS
 }
 
 type Godoc_result_entity struct {
@@ -80,9 +85,10 @@ type Godoc_results struct {
 	Results []Godoc_result_entity `json:"results"`
 }
 
-func NewGoWorkspace(gobin string, gopath []string, gocode *string) *GoWorkspace {
+func NewGoWorkspace(gobin string, wspath string, gocode *string, fs map[string]filesystem.WorkspaceFS) *GoWorkspace {
 	g := new(GoWorkspace)
 	g.gobinpath = gobin
+	g.filesystems = fs
 	g.Packages = make(map[string]*build.Package)
 	g.SystemPackages = make(map[string]*build.Package)
 	g.neededBy = make(map[string][]string)
@@ -90,12 +96,15 @@ func NewGoWorkspace(gobin string, gopath []string, gocode *string) *GoWorkspace 
 	g.testneededBy = make(map[string][]string)
 	g.testdependencies = make(map[string][]string)
 	g.context = build.Default
-	g.context.GOPATH = strings.Join(gopath, string(filepath.ListSeparator))
-	g.GoPath = gopath
+	gopath := fmt.Sprintf("%s%s%s", wspath, string(filepath.ListSeparator), g.context.GOPATH)
+	g.context.GOPATH = gopath
+	g.GoPathString = gopath
+	g.GoPath = filepath.SplitList(gopath)
 	goroot, err := g.env("GOROOT")
 	if err != nil {
 		log.Printf("no system packages found, cannot detect GOROOT from '%s': %s", gobin, err)
 	} else {
+		g.filesystems["GOROOT"] = filesystem.NewFS("GOROOT", goroot)
 		srcSystem := new(srcDir)
 		srcSystem.importer = g.importSystemPackage
 		srcSystem.path = filepath.Join(goroot, "src", "pkg")
@@ -105,23 +114,40 @@ func NewGoWorkspace(gobin string, gopath []string, gocode *string) *GoWorkspace 
 	g.context.GOARCH, _ = g.env("GOARCH")
 	g.context.GOOS, _ = g.env("GOOS")
 	log.Printf("CONTEXT:%+v", g.context)
-	for i, src := range gopath {
+	for i, src := range g.GoPath {
 		srcd := new(srcDir)
 		srcd.importer = g.importPackage
 		srcd.path = filepath.Join(src, "src")
 		filepath.Walk(srcd.path, srcd.walker)
 		if i == 0 {
 			// first element in gopath is special
-			g.Path = src
-			g.Workdir = filepath.Join(g.Path, workdir)
+			g.FirstPath = src
+			g.Workdir = filepath.Join(g.FirstPath, workdir)
 			// ignore error if directory exists
 			os.Mkdir(g.Workdir, 0755)
+		} else {
 		}
+		fs := filesystem.NewFS(filepath.Base(src), src)
+		g.filesystems[filepath.Base(src)] = fs
+		g.filesystemsOrdered = append(g.filesystemsOrdered, fs)
 	}
+	g.filesystemsOrdered = append(g.filesystemsOrdered, g.filesystems["GOROOT"])
 
 	g.resolve()
 
 	return g
+}
+
+func (ws *GoWorkspace) WorkspaceFS() filesystem.WorkspaceFS {
+	return ws.filesystemsOrdered[0]
+}
+
+func (ws *GoWorkspace) RootFS() []string {
+	var res []string
+	for _, f := range ws.filesystemsOrdered {
+		res = append(res, f.Name())
+	}
+	return res
 }
 
 func (ws *GoWorkspace) Shutdown() {
@@ -129,7 +155,7 @@ func (ws *GoWorkspace) Shutdown() {
 		ws.gocode.Kill()
 	}
 }
-func (ws *GoWorkspace) BuildPackage(base string, packdir string) (*[]BuildResult, *[]string, error) {
+func (ws *GoWorkspace) BuildPackage(base filesystem.WorkspaceFS, packdir string) (*[]BuildResult, *[]string, error) {
 	args := []string{}
 	dirs := []string{}
 	pack, err := ws.findPackageFromDirectory(packdir)
@@ -178,7 +204,7 @@ func (ws *GoWorkspace) BuildPackage(base string, packdir string) (*[]BuildResult
 	return &ws.Build, &dirs, nil
 }
 
-func (ws *GoWorkspace) FullBuild(base string, ignoredPackages map[string]bool) (*[]BuildResult, *[]string, error) {
+func (ws *GoWorkspace) FullBuild(base filesystem.WorkspaceFS, ignoredPackages map[string]bool) (*[]BuildResult, *[]string, error) {
 	args := []string{}
 	dirs := []string{}
 	for p, _ := range ws.Packages {
@@ -187,6 +213,7 @@ func (ws *GoWorkspace) FullBuild(base string, ignoredPackages map[string]bool) (
 			dirs = append(dirs, ws.findDirectoryFromPackage(p))
 		}
 	}
+	log.Printf("full build with %+v", args)
 	res, err := ws.build(args...)
 	if err != nil {
 		return nil, nil, err
@@ -212,7 +239,7 @@ func (ws *GoWorkspace) InstallPackage(pkg string, plugindir string) (err error) 
 	cmd := exec.Command(ws.gobinpath, "get", "-u", pkg)
 	cmd.Dir = plugindir
 	cmd.Env = []string{
-		fmt.Sprintf("GOPATH=%s", ws.Path),
+		fmt.Sprintf("GOPATH=%s", ws.GoPathString),
 		os.ExpandEnv("PATH=$PATH"), // git must be installed!
 	}
 	log.Printf("install %s: %+v", pkg, cmd)

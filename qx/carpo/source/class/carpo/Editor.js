@@ -5,15 +5,17 @@ qx.Class.define("carpo.Editor",
     properties : {
         filepath: { init: null },
         filename: { init: null },
+        filesystem: {init: null},
         content: { init: null },
         dirty : { init: false },
         mode: { init: null },
         config: { init: null, nullable:true }
     },
-    construct : function(filepath, filename, content, mode, config, workspace, app) {
+    construct : function(filesystem, filepath, filename, content, mode, config, workspace, app) {
         this.base(arguments, filename);
         this.setLayout(new qx.ui.layout.VBox(0));
         this.setFilepath(filepath);
+        this.setFilesystem(filesystem);
         this.setFilename(filename);
         this.setContent(content);
         this.setMode(mode);
@@ -102,7 +104,8 @@ qx.Class.define("carpo.Editor",
             return {
                 content:this.getEditorValue(),
                 path:this.getFilepath(),
-                mode:this.getMode()
+                mode:this.getMode(),
+                filesystem:this.getFilesystem()
             };
         },
         setEditorValue : function (val, clean) {

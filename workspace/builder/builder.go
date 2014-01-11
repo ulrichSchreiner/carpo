@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ulrichSchreiner/carpo/workspace/filesystem"
 	"go/build"
 	"go/parser"
 	"go/token"
@@ -48,6 +49,19 @@ func (ws *GoWorkspace) findPackageFromDirectory(dir string) (string, error) {
 
 func (ws *GoWorkspace) findDirectoryFromPackage(p string) string {
 	return filepath.Join("src", p)
+}
+
+func (ws *GoWorkspace) search(def filesystem.WorkspaceFS, cwd, pt string) (filesystem.WorkspaceFS, string, error) {
+	if strings.HasPrefix(pt, "../src") {
+		return def, pt[2:], nil
+	}
+	abspath := filepath.Clean(filepath.Join(cwd, pt))
+	for _, wfs := range ws.filesystems {
+		if strings.HasPrefix(abspath, wfs.Base()) {
+			return wfs, abspath[len(wfs.Base())-1:], nil
+		}
+	}
+	return nil, "", fmt.Errorf("cannot find %s/%s in filesystems", cwd, pt)
 }
 
 func (ws *GoWorkspace) addDependency(p *build.Package, needs []string) {
@@ -104,13 +118,9 @@ func (ws *GoWorkspace) importPackage(packname string, path string) error {
 	if err != nil {
 		return err
 	} else {
-		//TODO change this, set a ignore-list in the workspace
-		//if bytes.Compare([]byte(pack.Name), []byte("testdata")) != 0 {
-		//if bytes.Compare([]byte(pack.Name), []byte("main")) != 0 {
 		ws.Packages[packname] = pack
 		ws.addDependency(pack, pack.Imports)
 		ws.addTestDependency(pack, pack.TestImports)
-		//}
 	}
 	return nil
 }
@@ -218,10 +228,10 @@ func (ws *GoWorkspace) buildtests(args ...string) (res string) {
 	return
 }
 
-func (ws *GoWorkspace) parseBuildOutput(base string, output string) []BuildResult {
+func (ws *GoWorkspace) parseBuildOutput(base filesystem.WorkspaceFS, output string) []BuildResult {
 	return ws.parseBuildTypedOutput(base, output, BUILD_ERROR)
 }
-func (ws *GoWorkspace) parseBuildTypedOutput(base string, output string, etype BuildResultType) []BuildResult {
+func (ws *GoWorkspace) parseBuildTypedOutput(base filesystem.WorkspaceFS, output string, etype BuildResultType) []BuildResult {
 	var res []BuildResult
 	resultset := make(map[BuildResult]bool)
 	lines := strings.Split(output, "\n")
@@ -237,10 +247,17 @@ func (ws *GoWorkspace) parseBuildTypedOutput(base string, output string, etype B
 			br.Original = l
 			br.Source = string(m[1])
 			br.Type = etype
+			fs, pt, err := ws.search(base, ws.Workdir, br.Source)
+			if err != nil {
+				log.Printf("cannot parse buildresult : %s", err)
+				br.File = br.Source
+			} else {
+				br.File = pt
+				br.Filesystem = fs.Name()
+			}
 			// we always work in a subdirectory named ".carpowork", so strip the ".." from the filepath
-			br.File = br.Source[2:]
 			br.Directory = filepath.Dir(br.File)
-			pt, err := ws.findPackageFromDirectory(filepath.Join(base, br.Directory))
+			pt, err = ws.findPackageFromDirectory(filepath.Join(base.Base(), br.Directory))
 			if err != nil {
 				log.Printf("cannot find package for directory '%s': %s", br.Directory, err)
 			} else {
