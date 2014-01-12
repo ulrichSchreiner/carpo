@@ -129,12 +129,12 @@ qx.Class.define("carpo.EditorsPane",
               }
             };
             load (ofs, function () {
-              self.__silent = false;
               if (current) {
                 var ed = self.getEditorFor(current.filesystem, current.path);
                 self.fireDataEvent("fileSelected",{name:ed.getFilename(),path:ed.getFilepath(),filesystem:ed.getFilesystem()});
                 self.__showEditor(ed);
               }
+              self.__silent = false;
             });
           }
         },
