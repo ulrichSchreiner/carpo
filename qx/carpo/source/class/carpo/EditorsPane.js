@@ -115,24 +115,27 @@ qx.Class.define("carpo.EditorsPane",
           var self = this;
           if (config.editors && config.editors.openfiles) {
             this.__silent = true; // while this flag is set, the editor-state will not be saved
-            config.editors.openfiles.forEach(function (f) {
-              if (!self.getEditorFor(f.filesystem, f.path)) {
+            var ofs = config.editors.openfiles.slice();
+            // ugly code to load the files serial, one after another
+            var load = function (lst, cb) {
+              if (lst.length === 0) {
+                cb ();
+              } else {
+                var f = lst.shift();
                 self._workspace.loadFile (f.filesystem, f.path, function (data) {
-                  self.__openEditor(f.filesystem, f.path, data.title, data.content, data.filemode);     
+                  self.__openEditor(f.filesystem, f.path, data.title, data.content, data.filemode);
+                  load(lst, cb);
                 });  
               }
-            });
-            // real crappy code! normally i should wait until all open files are really
-            // loaded and after than i should select the "current" one. but this way it is
-            // more easily to implement, and most of the times it works. and if it does not
-            // work: well your current editor is not the same as in the last session (who cares :-)
-            qx.event.Timer.once(function () {
-              this.__silent = false;
+            };
+            load (ofs, function () {
+              self.__silent = false;
               if (current) {
-                var ed = this.getEditorFor(current.filesystem, current.path);
+                var ed = self.getEditorFor(current.filesystem, current.path);
+                self.fireDataEvent("fileSelected",{name:ed.getFilename(),path:ed.getFilepath(),filesystem:ed.getFilesystem()});
                 self.__showEditor(ed);
               }
-            }, this, 1000);
+            });
           }
         },
         

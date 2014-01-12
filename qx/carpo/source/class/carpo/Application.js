@@ -569,6 +569,7 @@ qx.Class.define("carpo.Application",
             data.build = true;
             this.workspace.saveFile(data.filesystem, data.path, data, function (rsp) {
               editor.setEditorValue(rsp.formattedcontent, true);
+              app.saveConfig(); // saves new breakpoints
               if (rsp.buildtype && rsp.buildtype == "golang")
                 app.showBuildResult(rsp);
             });
@@ -578,7 +579,7 @@ qx.Class.define("carpo.Application",
       var paths = this.editors.getDirtyPaths ();
       var cb = function (rsp) {
         this.setEditorValue(rsp.formattedcontent, true);        
-      }
+      };
       for (var i=0; i<paths.length; i++) {
         var editor = this.editors.getEditorFor(paths[i]);
         if (editor) {
@@ -588,6 +589,7 @@ qx.Class.define("carpo.Application",
           this.workspace.saveFile(data.filesystem, data.path, data, qx.lang.Function.bind(cb, editor));
         }
       }
+      this.saveConfig(); // save new breakpoints
     },
     build : function (evt, cb) {
         var config = this.getConfig();

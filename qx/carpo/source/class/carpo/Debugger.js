@@ -9,7 +9,7 @@ qx.Class.define("carpo.Debugger", {
       this._debugConfig = cfg.debugger;
       this._breakpoints = cfg.debugger.breakpoints;
     },
-    addBreakpoint : function (fs, src, line) {
+    addBreakpoint : function (fs, src, line, dontsave) {
       var bp = {
         filesystem : fs,
         source : src,
@@ -21,7 +21,8 @@ qx.Class.define("carpo.Debugger", {
       } else {
         this._breakpoints[key].push(bp);
       }
-      this._app.saveConfig();
+      if (!dontsave)
+        this._app.saveConfig();
     },
     removeBreakpoint : function (fs, src, line, dontsave) {
       var key = fs+src;
