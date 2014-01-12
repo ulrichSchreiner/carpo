@@ -905,13 +905,14 @@ qx.Class.define("carpo.Application",
       });
     },
     showFilteredPopup : function (evt, title, withdesc, loadfunc, selfunc, onfilterchange) {
+      var bnds = this.relativeBounds(2);
       var popup = new qx.ui.popup.Popup(new qx.ui.layout.VBox(3)).set({
         backgroundColor: "#FFFAD3",
         padding: [2, 4],
         offset : 3,
         offsetBottom : 20,
-        width: 600,
-        height: 400
+        width: bnds.width,
+        height: bnds.height
       });
 
       var head = new qx.ui.basic.Atom(title);
@@ -975,6 +976,15 @@ qx.Class.define("carpo.Application",
       });
     },
 
+    relativeBounds : function (divider) {
+      var parent = this.getRoot();
+      var bounds = parent.getBounds();
+      return {
+        width : Math.round(bounds.width / 2),
+        height : Math.round(bounds.height / 2)
+      };
+    },
+    
     center : function(widget) {
       var parent = this.getRoot();
       if (parent) {

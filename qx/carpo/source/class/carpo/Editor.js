@@ -68,9 +68,9 @@ qx.Class.define("carpo.Editor",
           bp = bp ? "" : " ace_breakpoint ";
           session.setBreakpoint(row, bp) ;
           if (bp) 
-            this._application.debugger.addBreakpoint(this.getFilepath(), row);
+            this._application.debugger.addBreakpoint(this.getFilesystem(), this.getFilepath(), row);
           else
-            this._application.debugger.removeBreakpoint(this.getFilepath(), row);
+            this._application.debugger.removeBreakpoint(this.getFilesystem(), this.getFilepath(), row);
         },
         focus : function () {
           if (this.__ace)
@@ -250,11 +250,20 @@ qx.Class.define("carpo.Editor",
                     this.jumpTo(this.__pos.row, this.__pos.col);  
                   },this,100);                  
                 }
+                var updateBPs = qx.lang.Function.bind(this.updateBreakpoints, this);
                 session.on('change', function(e) {
-                    self.setContent(session.getValue());
-                    self.setLabel("*"+self.getFilename());
-                    self.setDirty(true);
+                  var data = e.data;
+                  updateBPs(session, data);
+                  self.setContent(session.getValue());
+                  self.setLabel("*"+self.getFilename());
+                  self.setDirty(true);
                 });
+                var bps = self._application.debugger.getBreakpointsFor (this.getFilesystem(), this.getFilepath());
+                if (bps) {
+                  bps.forEach(function (b) {
+                    session.setBreakpoint(b.line, " ace_breakpoint ") ; 
+                  });
+                }
                 this.__ace.on("guttermousedown", qx.lang.Function.bind(this.showGutterMenu, this));
                 // append resize listener
                 this.__editor.addListener("resize", function() {
@@ -264,6 +273,36 @@ qx.Class.define("carpo.Editor",
                   }, 0);
                 });
             }, this, 100);            
+        },
+        updateBreakpoints : function (session, event) {
+          console.log(session, event);
+          var start = event.range.start.row;
+          var end = event.range.end.row;
+          if (start == end) return;
+          var diff = end - start;
+          if (diff > 0) {
+            // rows inserted
+          }
+          var bps = this._application.debugger.getBreakpointsFor(this.getFilesystem(), this.getFilepath());
+          var changed = false;
+          if (bps) {
+            for (var i=0; i<bps.length; i++) {
+              var bp = bps[i];
+              if (this.between(start, bp.line, end)) {
+                this._application.debugger.removeBreakpoint (bp.filesystem, bp.source, bp.line);
+                session.setBreakpoint(bp.line, "") ;
+                changed = true;
+              }
+            }
+          }
+          if (changed) {
+            this._application.saveConfig();
+          }
+        },
+        between : function (lim1, val, lim2) {
+          if (val <= lim2 && val >= lim1) return true;
+          if (val <= lim1 && val >= lim2) return true;
+          return false;
         }
     }
 });

@@ -9,33 +9,43 @@ qx.Class.define("carpo.Debugger", {
       this._debugConfig = cfg.debugger;
       this._breakpoints = cfg.debugger.breakpoints;
     },
-    addBreakpoint : function (src, line) {
+    addBreakpoint : function (fs, src, line) {
       var bp = {
+        filesystem : fs,
         source : src,
         line : line
       };
-      if (!this._breakpoints[src]) {
-        this._breakpoints[src] = [bp];
+      var key = fs+src;
+      if (!this._breakpoints[key]) {
+        this._breakpoints[key] = [bp];
       } else {
-        this._breakpoints[src].push(bp);
+        this._breakpoints[key].push(bp);
       }
       this._app.saveConfig();
     },
-    removeBreakpoint : function (src, line) {
-      var bps = this._breakpoints[src];
+    removeBreakpoint : function (fs, src, line, dontsave) {
+      var key = fs+src;
+      var bps = this._breakpoints[key];
       if (bps) {
         for (var i=0; i<bps.length; i++) {
           var bp = bps[i];
           if (bp.line == line) {
             bps.splice(i, 1);
-            return;
+            break;
           }
         }
-      this._app.saveConfig();
+        if (bps.length === 0)
+          delete this._breakpoints[key];
+        if (!dontsave)
+          this._app.saveConfig();
       }
     },
     getBreakpoints : function () {
       return this._breakpoints;
+    },
+    getBreakpointsFor : function (fs, src) {
+      var key = fs+src;
+      return this._breakpoints[key];
     },
     setBreakpoints : function (bps) {
       this._breakpoints = bps;
