@@ -59,6 +59,10 @@ qx.Class.define("carpo.Debugger", {
     
     removeSession : function (sess) {
       delete(this._sessions[sess.id]);
+    },
+    
+    getSession : function (sid) {
+      return this._sessions[sid];
     }
   }
 });

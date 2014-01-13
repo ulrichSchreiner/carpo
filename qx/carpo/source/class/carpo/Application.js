@@ -141,7 +141,14 @@ qx.Class.define("carpo.Application",
         output.add(problems);
         problems.add(this.compileroutput,{flex:1});
         this.problems = problems;
+        
         var runoutput = new qx.ui.tabview.Page("Run/Debug Console");
+        var console = new qx.ui.container.Composite(new qx.ui.layout.VBox(0));
+        var outputpanel = new qx.ui.splitpane.Pane("horizontal").set({
+            allowGrowY: true,
+            allowGrowX: true
+        });
+        
         runoutput.setLayout(new qx.ui.layout.VBox(0));
         this.txtRunoutput = new qx.ui.form.TextArea("");
         this.txtRunoutput.setReadOnly(true);
@@ -150,9 +157,17 @@ qx.Class.define("carpo.Application",
           if (el)
             el.scrollTop = el.scrollHeight;
         }, this);
-        runoutput.add (this.getRunningToolbar(this.txtRunoutput),{flex:0});
-        runoutput.add (this.txtRunoutput,{flex:1});
+        outputpanel.add(console,2);
+        this.debugpanel = new carpo.DebugPanel(this.debugger, this, this.workspace);
+        console.add (this.getRunningToolbar(this.txtRunoutput),{flex:0});
+        console.add (this.txtRunoutput,{flex:1});
+        
+        outputpanel.add (this.debugpanel,1);
+        runoutput.add (outputpanel, {flex:1});
+        //runoutput.add (this.debugpanel, {flex:1});
+        
         output.add(runoutput);
+        
         var ignoredPackages = new qx.ui.tabview.Page("Ignored Resources");
         ignoredPackages.setLayout(new qx.ui.layout.HBox(0));
         this.ignoredPackagesModel = new qx.ui.table.model.Simple();
@@ -385,6 +400,17 @@ qx.Class.define("carpo.Application",
         }
       });
       ctrl.bind("selection[0].output", output, "value");
+      ctrl.bind("selection[0].session", this.debugpanel, "currentSession");
+      /*ctrl.getSelection().addListener ("change", function (e) {
+        var d = e.getData();
+        if (d.type === "add")
+          this.debugpanel.setCurrentSession(d.added[0].getSession());
+        else if (d.type === "remove")
+          this.debugpanel.setCurrentSession(null);
+        //console.log(e.getData());
+      }, this);*/
+      //ctrl.bind("selection[0]", this.debugpanel, "currentSession");
+      
       stopButton.addListener ("execute", function (e) {
         var sel = processes.getSelection()[0];
         if (sel) sel = sel.getModel();
@@ -421,7 +447,7 @@ qx.Class.define("carpo.Application",
       }, this);
       menu.add(newConfig);
       
-      this.debugButton = new qx.ui.form.Button(null,qx.util.ResourceManager.getInstance().toUri("carpo/Debug-Bug-2-icon.png"),null);
+      this.debugButton = new qx.ui.form.Button(null,"carpo/Debug-Bug-2-icon.png");
       toolbar.add(this.debugButton);
       this.debugButton.addListener("execute", this.debug, this);
       this.runButton = new qx.ui.form.SplitButton(null,"icon/16/actions/go-next.png", menu);
@@ -746,8 +772,10 @@ qx.Class.define("carpo.Application",
       service.launchconfig = launch;
       service.pid = null;
       service.output = "";
+      service.debug = false;
       service.defaultname = launch.name;
       service.name = launch.name;
+      service.session = null;
       var model = qx.data.marshal.Json.createModel(service);
       var self = this;
       service.connect = function() {
@@ -789,8 +817,10 @@ qx.Class.define("carpo.Application",
       service.launchconfig = launch;
       service.pid = null;
       service.output = "";
+      service.debug = true;
       service.defaultname = "DEBUG: "+launch.name;
       service.name = launch.name;
+      service.session = null;
 
       var model = qx.data.marshal.Json.createModel(service);
       var self = this;
@@ -821,6 +851,7 @@ qx.Class.define("carpo.Application",
               model.setPid(pid.trim());    
               model.setName(model.getDefaultname()+" ["+model.getPid()+"]");
               debugSession = self.debugger.addSession(model.getPid());
+              model.setSession(debugSession);
               debugConsoleId = debugSession.addListener("consoleOutput", function (e) {
                 var dat = e.getData();
                 console.log("consoleoutput: ", dat);

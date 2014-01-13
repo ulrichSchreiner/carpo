@@ -104,7 +104,7 @@ func NewGoWorkspace(gobin string, wspath string, gocode *string, fs map[string]f
 	if err != nil {
 		log.Printf("no system packages found, cannot detect GOROOT from '%s': %s", gobin, err)
 	} else {
-		g.filesystems["GOROOT"] = filesystem.NewFS("GOROOT", goroot)
+		g.filesystems["GOROOT"] = filesystem.NewFS("GOROOT", filepath.Clean(goroot))
 		srcSystem := new(srcDir)
 		srcSystem.importer = g.importSystemPackage
 		srcSystem.path = filepath.Join(goroot, "src", "pkg")
@@ -127,7 +127,7 @@ func NewGoWorkspace(gobin string, wspath string, gocode *string, fs map[string]f
 			os.Mkdir(g.Workdir, 0755)
 		} else {
 		}
-		fs := filesystem.NewFS(filepath.Base(src), src)
+		fs := filesystem.NewFS(filepath.Base(src), filepath.Clean(src))
 		g.filesystems[filepath.Base(src)] = fs
 		g.filesystemsOrdered = append(g.filesystemsOrdered, fs)
 	}

@@ -1,9 +1,11 @@
 qx.Class.define("carpo.DebugSession", {
   extend : qx.core.Object,
   events : {
-    "consoleOutput"   : "qx.event.type.Data"
+    "consoleOutput"   : "qx.event.type.Data",
+    "debugEvent" : "qx.event.type.Data"
   },
   construct : function(dbg, id) {
+    this.base(arguments);
     this.id = id;
     this.debugger = dbg;
   },
@@ -18,7 +20,8 @@ qx.Class.define("carpo.DebugSession", {
     },
     on_async : function (e) {
       var aevent = e.event;
-      console.log("async:",aevent);
+      console.log("async:",aevent,this);
+      this.fireDataEvent("debugEvent", aevent);
     },
     on_console : function (e) {
       var cevent = e.console;

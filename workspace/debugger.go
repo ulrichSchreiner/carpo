@@ -17,10 +17,16 @@ const (
 	ev_async              = "async"
 )
 
+type gdbjsonevent struct {
+	gdbmi.GDBEvent
+	TypeName string `json:"typeName"`
+	StopName string `json:"stopName"`
+}
+
 type message struct {
 	DebuggerEvent debugEvent                   `json:"debuggerEvent"`
 	Console       *gdbmi.GDBTargetConsoleEvent `json:"console"`
-	Event         *gdbmi.GDBEvent              `json:"event"`
+	Event         *gdbjsonevent                `json:"event"`
 }
 
 func (ws *workspace) debug(lc *launchConfig) (*gdbmi.GDB, error) {
@@ -62,6 +68,9 @@ func debugProcessHandler(wks *workspace) websocket.Handler {
 							}
 						case ev := <-gdb.Event:
 							log.Printf("received: %+v", ev)
+							if err = enc.Encode(eventMessage(&ev)); err != nil {
+								log.Printf("cannot json-encode message: %s (%+v)", err, ev)
+							}
 							if ev.StopReason == gdbmi.Async_stopped_exited ||
 								ev.StopReason == gdbmi.Async_stopped_exited_normally ||
 								ev.StopReason == gdbmi.Async_stopped_exited_signalled {
@@ -88,5 +97,6 @@ func targetConsoleMessage(ev *gdbmi.GDBTargetConsoleEvent) message {
 }
 
 func eventMessage(ev *gdbmi.GDBEvent) message {
-	return message{ev_async, nil, ev}
+	jev := gdbjsonevent{*ev, ev.Type.String(), ev.StopReason.String()}
+	return message{ev_async, nil, &jev}
 }

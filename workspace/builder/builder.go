@@ -58,7 +58,7 @@ func (ws *GoWorkspace) search(def filesystem.WorkspaceFS, cwd, pt string) (files
 	abspath := filepath.Clean(filepath.Join(cwd, pt))
 	for _, wfs := range ws.filesystems {
 		if strings.HasPrefix(abspath, wfs.Base()) {
-			return wfs, abspath[len(wfs.Base())-1:], nil
+			return wfs, abspath[len(wfs.Base()):], nil
 		}
 	}
 	return nil, "", fmt.Errorf("cannot find %s/%s in filesystems", cwd, pt)
