@@ -58,6 +58,7 @@ qx.Class.define("carpo.DebugPanel", {
         this._stepout.set({enabled:false});
       },
       step_run : function () {
+        this.debugger.cmd_run(this.getDebugSession().getService());
       },
       
       step_pause : function () {
@@ -98,9 +99,14 @@ qx.Class.define("carpo.DebugPanel", {
       
       onRunning : function (e) {
         this._pause.setEnabled(true);
+        this._run.setEnabled(false);
       },
       onStopped : function (e) {
         this._pause.setEnabled(false);
+        if (e.getData().stopName === "exited-normally")
+          this._run.setEnabled(false);
+        else
+          this._run.setEnabled(true);
       }
     }
 });

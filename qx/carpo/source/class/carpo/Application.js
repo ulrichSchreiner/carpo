@@ -400,7 +400,7 @@ qx.Class.define("carpo.Application",
         }
       });
       ctrl.bind("selection[0].output", output, "value");
-      ctrl.bind("selection[0].session", this.debugpanel, "currentSession");
+      ctrl.bind("selection[0]", this.debugpanel, "currentSession");
       /*ctrl.getSelection().addListener ("change", function (e) {
         var d = e.getData();
         if (d.type === "add")
@@ -769,14 +769,16 @@ qx.Class.define("carpo.Application",
     },
     launchProcess : function (launch) {
       var service = {};
-      service.launchconfig = launch;
-      service.pid = null;
-      service.output = "";
-      service.debug = false;
-      service.defaultname = launch.name;
-      service.name = launch.name;
-      service.session = null;
-      var model = qx.data.marshal.Json.createModel(service);
+      //service.launchconfig = launch;
+      //service.pid = null;
+      //service.output = "";
+      //service.debug = false;
+      //service.defaultname = launch.name;
+      //service.name = launch.name;
+      //service.session = null;
+      //var model = qx.data.marshal.Json.createModel(service);
+      var session = new carpo.DebugSession(this.debugger, launch, "", false, launch.name, launch.name);
+
       var self = this;
       service.connect = function() {
         var pid = "";
@@ -789,44 +791,45 @@ qx.Class.define("carpo.Application",
         ws.onerror = function(e) { console.log("on error"); };
         
         ws.onclose = function (e) {
-          model.setPid("");    
-          model.setName(model.getDefaultname()+" [STOPPED]");
+          session.setPid("");    
+          session.setName(session.getDefaultname()+" [STOPPED]");
         };
   
         ws.onmessage = function(e) {
           var data = e.data;
-          if (!model.getPid()) {
+          if (!session.getPid()) {
             pid = pid + data;
             if (pid[pid.length-1] == "\n") {
-              model.setPid(pid.trim());    
-              model.setName(model.getDefaultname()+" ["+model.getPid()+"]");
+              session.setPid(pid.trim());    
+              session.setName(session.getDefaultname()+" ["+session.getPid()+"]");
             }
           } else {
-            model.setOutput(model.getOutput()+e.data);
+            session.setOutput(session.getOutput()+e.data);
           }
         };
   
         service.ws = ws;
       };
-      this.processes.push(model);
-      this.processList.setModelSelection([model]);
+      this.processes.push(session);
+      this.processList.setModelSelection([session]);
       return service;
     },
     debugProcess : function (launch) {
       var service = {};
-      service.launchconfig = launch;
-      service.pid = null;
-      service.output = "";
-      service.debug = true;
-      service.defaultname = "DEBUG: "+launch.name;
-      service.name = launch.name;
-      service.session = null;
+      //service.launchconfig = launch;
+      //service.pid = null;
+      //service.output = "";
+      //service.debug = true;
+      //service.defaultname = "DEBUG: "+launch.name;
+      //service.name = launch.name;
+      //service.session = null;
 
-      var model = qx.data.marshal.Json.createModel(service);
+      //var model = qx.data.marshal.Json.createModel(service);
+      var session = new carpo.DebugSession(this.debugger, launch, "", true, "DEBUG: "+launch.name, launch.name);
       var self = this;
       service.connect = function() {
         var pid = "";
-        var debugSession = null;
+        //var debugSession = null;
         var debugConsoleId = null;
         
         if(service.ws) { return; }
@@ -837,37 +840,38 @@ qx.Class.define("carpo.Application",
         ws.onerror = function(e) { console.log("on error"); };
         
         ws.onclose = function (e) {
-          model.setPid("");    
-          model.setName(model.getDefaultname()+" [STOPPED]");
-          debugSession.removeListenerById(debugConsoleId);
-          self.debugger.removeSession(debugSession);
+          session.setPid("");    
+          session.setName(session.getDefaultname()+" [STOPPED]");
+          session.removeListenerById(debugConsoleId);
+          self.debugger.removeSession(session);
         };
   
         ws.onmessage = function(e) {
           var data = e.data;
-          if (!model.getPid()) {
+          if (!session.getPid()) {
             pid = pid + data;
             if (pid[pid.length-1] == "\n") {
-              model.setPid(pid.trim());    
-              model.setName(model.getDefaultname()+" ["+model.getPid()+"]");
-              debugSession = self.debugger.addSession(model.getPid());
-              model.setSession(debugSession);
-              debugConsoleId = debugSession.addListener("consoleOutput", function (e) {
+              session.setPid(pid.trim());    
+              session.setName(session.getDefaultname()+" ["+session.getPid()+"]");
+              self.debugger.addSession(session);
+              session.setService(service);
+              //model.setSession(debugSession);
+              debugConsoleId = session.addListener("consoleOutput", function (e) {
                 var dat = e.getData();
                 console.log("consoleoutput: ", dat);
-                model.setOutput(model.getOutput()+dat.line);
+                session.setOutput(session.getOutput()+dat.line);
               });
             }
           } else {
             console.log("debug-message:",e.data);
-            debugSession.message(e.data);
+            session.message(e.data);
           }
         };
   
         service.ws = ws;
       };
-      this.processes.push(model);
-      this.processList.setModelSelection([model]);
+      this.processes.push(session);
+      this.processList.setModelSelection([session]);
       return service;
     },
     getWebsocket : function (launchtype, launch) {

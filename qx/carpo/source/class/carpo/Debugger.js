@@ -51,18 +51,29 @@ qx.Class.define("carpo.Debugger", {
     setBreakpoints : function (bps) {
       this._breakpoints = bps;
     },
-    addSession : function (sid) {
-      var s = new carpo.DebugSession(this, sid);
-      this._sessions[sid] = s;
+    addSession : function (s) {
+      this._sessions[s.getPid()] = s;
       return s;
     },
     
     removeSession : function (sess) {
-      delete(this._sessions[sess.id]);
+      delete(this._sessions[sess.getPid()]);
     },
     
     getSession : function (sid) {
       return this._sessions[sid];
+    },
+    
+    _sendCommand : function (service, cmd) {
+      service.ws.send(qx.lang.Json.stringify(cmd));
+    },
+    cmd_run : function (service) {
+      var cmd = {command:"run",params:{}};
+      this._sendCommand(service, cmd);
+    },
+    cmd_getBreakpointInfo : function (service) {
+      var cmd = {command:"breakpointInfo",params:{}};
+      this._sendCommand(service, cmd);
     }
   }
 });

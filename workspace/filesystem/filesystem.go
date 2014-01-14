@@ -10,6 +10,7 @@ import (
 type WorkspaceFS interface {
 	Base() string
 	Name() string
+	Abs(name string) string
 	Open(name string, flag int, fm os.FileMode) (WorkspaceFile, error)
 	Create(name string) (WorkspaceFile, error)
 	Stat(name string) (os.FileInfo, error)
@@ -36,6 +37,9 @@ func (fs *wksFS) Name() string {
 }
 func (fs *wksFS) Base() string {
 	return fs.base
+}
+func (fs *wksFS) Abs(name string) string {
+	return filepath.Join(fs.base, name)
 }
 func (fs *wksFS) Open(name string, flag int, fm os.FileMode) (WorkspaceFile, error) {
 	return os.OpenFile(filepath.Join(fs.base, name), flag, fm)

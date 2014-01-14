@@ -291,7 +291,6 @@ qx.Class.define("carpo.Editor",
         }, this, 100);            
       },
       updateBreakpoints : function (session, event) {
-        console.log(session, event);
         if (this._documentReset) return;
         var start = event.range.start.row;
         var end = event.range.end.row;
@@ -301,7 +300,7 @@ qx.Class.define("carpo.Editor",
         var diff = end - start;
         var targ = this["check_"+event.action];
         if (!targ) {
-          console.log("no handler for session event:",event)
+          console.log("no handler for session event:",event);
           return;
         }
         var func = qx.lang.Function.bind(targ, this);
