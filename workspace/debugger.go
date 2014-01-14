@@ -59,7 +59,7 @@ func (ws *workspace) breakpoints() []breakpoint {
 						if ok {
 							// add breakpoint only if filesystem is known
 							bp.source = fs.Abs(bpitem["source"].(string))
-							bp.line = int(bpitem["line"].(float64))
+							bp.line = int(bpitem["line"].(float64)) + 1
 							result = append(result, *bp)
 						}
 					}
@@ -164,6 +164,12 @@ func debugProcessHandler(wks *workspace) websocket.Handler {
 						switch cmd.Command {
 						case "run":
 							gdb.Exec_continue(true, false, nil)
+						case "next":
+							gdb.Exec_next(false)
+						case "step":
+							gdb.Exec_step(false)
+						case "return":
+							gdb.Exec_return()
 						}
 					}
 				}()

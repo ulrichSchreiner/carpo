@@ -859,7 +859,7 @@ qx.Class.define("carpo.Application",
               debugConsoleId = session.addListener("consoleOutput", function (e) {
                 var dat = e.getData();
                 console.log("consoleoutput: ", dat);
-                session.setOutput(session.getOutput()+dat.line);
+                session.setOutput(session.getOutput()+dat.line+"\n");
               });
             }
           } else {

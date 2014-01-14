@@ -65,12 +65,15 @@ qx.Class.define("carpo.DebugPanel", {
       },
       
       step_stepinto : function () {
+        this.debugger.cmd_step(this.getDebugSession().getService());
       },
       
       step_stepover : function () {
+        this.debugger.cmd_next(this.getDebugSession().getService());
       },
       
       step_stepout : function () {
+        this.debugger.cmd_return(this.getDebugSession().getService());
       },
       
       setCurrentSession : function (s) {
@@ -100,13 +103,20 @@ qx.Class.define("carpo.DebugPanel", {
       onRunning : function (e) {
         this._pause.setEnabled(true);
         this._run.setEnabled(false);
+        this._stepinto.setEnabled(false);
+        this._stepover.setEnabled(false);
+        this._stepout.setEnabled(false);
       },
       onStopped : function (e) {
         this._pause.setEnabled(false);
         if (e.getData().stopName === "exited-normally")
           this._run.setEnabled(false);
-        else
+        else {
           this._run.setEnabled(true);
+          this._stepinto.setEnabled(true);
+          this._stepover.setEnabled(true);
+          this._stepout.setEnabled(true);
+        }
       }
     }
 });

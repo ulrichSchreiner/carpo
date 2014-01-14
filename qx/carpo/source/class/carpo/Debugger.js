@@ -71,6 +71,18 @@ qx.Class.define("carpo.Debugger", {
       var cmd = {command:"run",params:{}};
       this._sendCommand(service, cmd);
     },
+    cmd_next : function (service) {
+      var cmd = {command:"next",params:{}};
+      this._sendCommand(service, cmd);
+    },
+    cmd_step : function (service) {
+      var cmd = {command:"step",params:{}};
+      this._sendCommand(service, cmd);
+    },
+    cmd_return : function (service) {
+      var cmd = {command:"return",params:{}};
+      this._sendCommand(service, cmd);
+    },
     cmd_getBreakpointInfo : function (service) {
       var cmd = {command:"breakpointInfo",params:{}};
       this._sendCommand(service, cmd);
