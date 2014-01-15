@@ -10,7 +10,7 @@
 
 qx.Theme.define("carpo.theme.Font",
 {
-  extend : qx.theme.indigo.Font,
+  extend : qx.theme.modern.Font,
 
   fonts :
   {

@@ -15,6 +15,7 @@ qx.Class.define("carpo.DebugPanel", {
       this.base(arguments);
       this.setDebugSession(null);
       this.debugger = dbg;
+      this.application = app;
       
       this.createCommands ();
       this.setLayout(new qx.ui.layout.VBox());
@@ -109,13 +110,18 @@ qx.Class.define("carpo.DebugPanel", {
       },
       onStopped : function (e) {
         this._pause.setEnabled(false);
-        if (e.getData().stopName === "exited-normally")
+        if (e.getData().stopName === "exited-normally") {
           this._run.setEnabled(false);
+          this.debugger.gotoLine(null);
+        }
         else {
           this._run.setEnabled(true);
           this._stepinto.setEnabled(true);
           this._stepover.setEnabled(true);
           this._stepout.setEnabled(true);
+          var dat = e.getData();
+          if (dat && dat.currentStackFrame)
+            this.debugger.gotoLine(dat.filesystem, dat.path, dat.currentStackFrame.line);
         }
       }
     }

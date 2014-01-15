@@ -56,8 +56,8 @@ qx.Class.define("carpo.Workspace",
       d.saveconfig({}, data);          
     },
     
-    loadFile : function (fs, pt, cb) {
-        var d  =this.__getresource("loadFile","POST","/workspace/readfile", cb);
+    loadFile : function (fs, pt, cb, err) {
+        var d  =this.__getresource("loadFile","POST","/workspace/readfile", cb,err);
         var data = {filesystem:fs, path:pt};
         d.loadFile({},data);
     },
@@ -106,6 +106,10 @@ qx.Class.define("carpo.Workspace",
     queryRemotePackages : function (n,cb,errcb) {
       var d = this.__getresource("queryRemotePackages","GET","/workspace/queryremotepackages", cb, errcb);
       d.queryRemotePackages({},"q="+n);
-    }
+    },
+    wizardCommandLine : function (data, cb) {
+      var d  = this.__getresource("commandLine","POST","/workspace/wizard/commandLine", cb);
+      d.commandLine({}, data);
+    },    
   }
 });

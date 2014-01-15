@@ -7,6 +7,18 @@ qx.Class.define("carpo.RunConfiguration", {
     events : {
       "ok"   : "qx.event.type.Data"
     },
+    statics : {
+      newConfig : function (num) {
+        return {
+          id : "config-"+num,
+          name :"New Configuration",
+          executable:"{{.Workspace}}/bin/yourprogram",
+          workingDirectory:"{{.Workspace}}",
+          params : "",
+          environment : "PATH=$PATH"
+        };
+      }
+    },
     construct : function(settings) {
       this.base(arguments, "Run Configuration");
       this.settings = settings;
@@ -26,7 +38,7 @@ qx.Class.define("carpo.RunConfiguration", {
       var addButton = new qx.ui.form.Button(null,"icon/16/actions/list-add.png");
       toolbar.add(addButton);
       addButton.addListener ("click", function (e) {
-        this.data.push(this.newConfig(this.data.getLength()));
+        this.data.push(new qx.data.marshal.Json.createModel(carpo.RunConfiguration.newConfig((new Date().getTime()))));
       }, this);
       var removeButton = new qx.ui.form.Button(null,"icon/16/actions/list-remove.png");
       toolbar.add(removeButton);
@@ -134,15 +146,6 @@ qx.Class.define("carpo.RunConfiguration", {
       configmodel : function (c) {
         return qx.data.marshal.Json.createModel(c);
       },
-      newConfig : function (num) {
-        return qx.data.marshal.Json.createModel({
-          id : "config-"+num,
-          name :"New Configuration",
-          executable:"{{.Workspace}}/bin/yourprogram",
-          workingDirectory:"{{.Workspace}}",
-          params : "",
-          environment : "PATH=$PATH"
-        });
-      }
+
     }
 });

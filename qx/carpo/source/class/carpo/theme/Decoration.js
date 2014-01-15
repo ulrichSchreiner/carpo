@@ -10,7 +10,7 @@
 
 qx.Theme.define("carpo.theme.Decoration",
 {
-  extend : qx.theme.indigo.Decoration,
+  extend : qx.theme.modern.Decoration,
 
   decorations :
   {

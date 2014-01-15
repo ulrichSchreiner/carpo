@@ -10,7 +10,7 @@
 
 qx.Theme.define("carpo.theme.Appearance",
 {
-  extend : qx.theme.indigo.Appearance,
+  extend : qx.theme.modern.Appearance,
 
   appearances :
   {

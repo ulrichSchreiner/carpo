@@ -1,9 +1,11 @@
 package filesystem
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // An abstraction of a filesystem how we need it.
@@ -54,7 +56,7 @@ func (fs *wksFS) RemoveAll(path string) error {
 	return os.RemoveAll(filepath.Join(fs.base, path))
 }
 func (fs *wksFS) Mkdir(path string, mode os.FileMode) error {
-	return os.Mkdir(filepath.Join(fs.base, path), mode)
+	return os.MkdirAll(filepath.Join(fs.base, path), mode)
 }
 
 func AbsolutePathWrite(fs WorkspaceFS, cpath string) (string, string, WorkspaceFile, error) {
@@ -74,4 +76,18 @@ func absolutePath(fs WorkspaceFS, cpath string, flag int, fm os.FileMode) (strin
 	} else {
 		return filepath.Join(fs.Base(), rpath), rpath, fl, nil
 	}
+}
+
+func FindFilesystem(abspath string, fs map[string]WorkspaceFS) (WorkspaceFS, string, error) {
+	for _, wfs := range fs {
+		base := wfs.Base()
+		if strings.HasPrefix(abspath, base) {
+			rel, err := filepath.Rel(base, abspath)
+			if err != nil {
+				return nil, "", err
+			}
+			return wfs, fmt.Sprintf("/%s", rel), nil
+		}
+	}
+	return nil, "", fmt.Errorf("no Filesystem found for path %s", abspath)
 }

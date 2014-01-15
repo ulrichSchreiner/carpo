@@ -69,9 +69,9 @@ qx.Class.define("carpo.Editor",
         bp = bp ? "" : " ace_breakpoint ";
         session.setBreakpoint(row, bp) ;
         if (bp) 
-          this._application.debugger.addBreakpoint(this.getFilesystem(), this.getFilepath(), row);
+          this._application.debugger.addBreakpoint(this.getFilesystem(), this.getFilepath(), row+1);
         else
-          this._application.debugger.removeBreakpoint(this.getFilesystem(), this.getFilepath(), row);
+          this._application.debugger.removeBreakpoint(this.getFilesystem(), this.getFilepath(), row+1);
       },
       focus : function () {
         if (this.__ace)
@@ -86,6 +86,20 @@ qx.Class.define("carpo.Editor",
           this.__pos = null;
         } else {
           this.__pos = {row:row,col:col};
+        }
+      },
+      highlightDebuggerLine : function (line) {
+        if (this._currentDebuggerLine) {
+          this.__ace.getSession().removeMarker(this._currentDebuggerLine.id);
+        }
+        if (!this.__ace) {
+          this.__currentDebuggerLine = line;
+        } else {
+          if (line != -1)
+            this._currentDebuggerLine = this.__ace.getSession().highlightLines(line-1, line-1); //+1, "debugline");
+          //var Range = require("ace/range").Range;
+          //this._currentDebuggerLine = this.__ace.getSession().addMarker(new Range(line, 0, line+1, 0),"debugline", "line");
+          //this.__currentDebuggerLine = line;
         }
       },
       
@@ -129,9 +143,9 @@ qx.Class.define("carpo.Editor",
         if (bps) {
           bps.forEach(function (b) {
             if (b.line >= maxlen) {
-              dbg.removeBreakpoint(b.filesystem, b.source, b.line);
+              dbg.removeBreakpoint(b.filesystem, b.source, b.line-1);
             } else {
-              editor.getSession().setBreakpoint(b.line, " ace_breakpoint ") ; 
+              editor.getSession().setBreakpoint(b.line-1, " ace_breakpoint ") ; 
             }
           });
         }
@@ -277,9 +291,12 @@ qx.Class.define("carpo.Editor",
           var bps = self._application.debugger.getBreakpointsFor (this.getFilesystem(), this.getFilepath());
           if (bps) {
             bps.forEach(function (b) {
-              session.setBreakpoint(b.line, " ace_breakpoint ") ; 
+              session.setBreakpoint(b.line-1, " ace_breakpoint ") ; 
             });
           }
+          if (this.__currentEditorLine)
+            this.highlightDebuggerLine(this.__currentEditorLine);
+            
           this.__ace.on("guttermousedown", qx.lang.Function.bind(this.showGutterMenu, this));
           // append resize listener
           this.__editor.addListener("resize", function() {
@@ -300,7 +317,7 @@ qx.Class.define("carpo.Editor",
         var diff = end - start;
         var targ = this["check_"+event.action];
         if (!targ) {
-          console.log("no handler for session event:",event);
+          //console.log("no handler for session event:",event);
           return;
         }
         var func = qx.lang.Function.bind(targ, this);
@@ -312,11 +329,11 @@ qx.Class.define("carpo.Editor",
         }
       },
       _check_bp : function (session, start, end, diff, bp) {
-        if (start > bp.line) return false; // breakpoint is before change area
+        if (start > bp.line-1) return false; // breakpoint is before change area
         this._application.debugger.removeBreakpoint (bp.filesystem, bp.source, bp.line, true);
-        session.setBreakpoint(bp.line, "") ;
+        session.setBreakpoint(bp.line-1, "") ;
         this._application.debugger.addBreakpoint (bp.filesystem, bp.source, bp.line+diff, true);
-        session.setBreakpoint(bp.line+diff, " ace_breakpoint ") ;
+        session.setBreakpoint(bp.line+diff-1, " ace_breakpoint ") ;
         return true;
       },
       check_insertText : function (session, start, end, diff, bp) {
@@ -326,9 +343,9 @@ qx.Class.define("carpo.Editor",
         return this.check_removeText(session, start, end, diff, bp);
       },
       check_removeText : function (session, start, end, diff, bp) {
-        if (this.between(start, bp.line, end)) {
+        if (this.between(start, bp.line-1, end)) {
           this._application.debugger.removeBreakpoint (bp.filesystem, bp.source, bp.line, true);
-          session.setBreakpoint(bp.line, "") ;
+          session.setBreakpoint(bp.line-1, "") ;
           return true;
         }
         return this._check_bp(session, start, end, -1*diff, bp);

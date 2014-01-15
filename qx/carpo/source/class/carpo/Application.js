@@ -220,6 +220,21 @@ qx.Class.define("carpo.Application",
           app.build();
         });
     },
+    openFile : function (fs, path) {
+      var app = this;
+      this.workspace.loadFile (fs, path, function (data) {
+          app.editors.openEditor(fs, path, data.title, data.content, data.filemode);     
+          app.showAnnotations();
+      });          
+    },
+    openFileAtLine : function (fs, path, line) {
+      var app = this;
+      this.workspace.loadFile (fs, path, function (data) {
+          var ed = app.editors.openEditor(fs, path, data.title, data.content, data.filemode); 
+          if (ed) ed.highlightDebuggerLine(line);
+      });          
+    },
+    
     showStatusMessage : function (msg, pending) {
       if (pending)
         this.status.setValue("<i>"+msg+"</i>");
@@ -380,6 +395,8 @@ qx.Class.define("carpo.Application",
         this._addImport.addListener("execute", this.addImport, this);
         this._addPackage = new qx.ui.core.Command("Ctrl-Shift-J");
         this._addPackage.addListener("execute", this.addPackage, this);
+        this._createGoProject = new qx.ui.core.Command();
+        this._createGoProject.addListener("execute", this.createGoProject, this);
     },
     getRunningToolbar : function (output) {
       var toolbar = new qx.ui.toolbar.ToolBar();
@@ -481,6 +498,15 @@ qx.Class.define("carpo.Application",
       this.updaterunconfigsInToolbar(config);
     },
     
+    addRunconfiguration : function (rc) {
+      var config = this.getConfig();
+      rc.id = "config-"+(new Date().getTime());
+      config.runconfig.configs[rc.id] = rc;
+      config.runconfig.current = rc.id;
+      this.saveConfig();
+      this.updaterunconfigsInToolbar(config);
+    },
+    
     updaterunconfigsInToolbar : function (config) {
       var app = this;
       var current = null;
@@ -537,7 +563,7 @@ qx.Class.define("carpo.Application",
     getFileMenu : function() {
         var menu = new qx.ui.menu.Menu();
         
-        //var newButton = new qx.ui.menu.Button("New", "icon/16/actions/document-new.png", this._newCommand);
+        var newButton = new qx.ui.menu.Button("New", null, null, this.getNewMenu());
         //var openButton = new qx.ui.menu.Button("Open", "icon/16/actions/document-open.png", this._openCommand);
         //var closeButton = new qx.ui.menu.Button("Close");
         var saveButton = new qx.ui.menu.Button("Save", "icon/16/actions/document-save.png", this._saveCommand);
@@ -557,6 +583,7 @@ qx.Class.define("carpo.Application",
         //menu.add(newButton);
         //menu.add(openButton);
         //menu.add(closeButton);
+        menu.add(newButton);
         menu.add(saveButton);
         menu.add(saveAllButton);
         //menu.add(saveAsButton);
@@ -564,6 +591,14 @@ qx.Class.define("carpo.Application",
         menu.add(exitButton);
         
         return menu;
+    },
+    getNewMenu : function () {
+      var menu = new qx.ui.menu.Menu ();
+
+      var goproject = new qx.ui.menu.Button ("Go Project", null, this._createGoProject);
+      menu.add (goproject);
+      
+      return menu;
     },
     
     getToolsMenu : function () {
@@ -1013,12 +1048,14 @@ qx.Class.define("carpo.Application",
       });
     },
 
-    relativeBounds : function (divider) {
+    relativeBounds : function (divider, ydivider) {
+      if (!ydivider)
+        ydivider = divider;
       var parent = this.getRoot();
       var bounds = parent.getBounds();
       return {
-        width : Math.round(bounds.width / 2),
-        height : Math.round(bounds.height / 2)
+        width : Math.round(bounds.width / divider),
+        height : Math.round(bounds.height / ydivider)
       };
     },
     
@@ -1039,6 +1076,16 @@ qx.Class.define("carpo.Application",
         }
       }
     },    
+    createGoProject : function () {
+      var bnds = this.relativeBounds(4,3);
+      var wiz = new carpo.CreationWizard (this.workspace, this).set({
+        width : bnds.width,
+        height : bnds.height
+      });
+      this.center(wiz);
+      this.getRoot().add(wiz);
+      wiz.show();
+    },
     
     debugButton : function (event) {
         this.debug("Execute button: " + this.getLabel());

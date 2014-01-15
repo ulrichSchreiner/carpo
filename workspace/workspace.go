@@ -59,6 +59,7 @@ func (w *workspace) register(container *restful.Container) {
 	ws.Route(ws.GET("/queryremotepackages").To(w.queryremotepackages).Writes(query_packages{}))
 	ws.Route(ws.GET("/process/{pid}/kill").To(w.killproc))
 	ws.Route(ws.GET("/exit").To(w.exitCarpo))
+	ws.Route(ws.POST("/wizard/commandLine").To(w.createCommandLineUtility).Reads(wizard_commandline{}))
 	container.Add(&ws)
 }
 
@@ -663,6 +664,9 @@ func NewWorkspace(path string) error {
 
 		path = filepath.Join(workdir, path)
 	}
+	os.Mkdir(filepath.Join(path, "src"), 0755)
+	os.Mkdir(filepath.Join(path, "pkg"), 0755)
+	os.Mkdir(filepath.Join(path, "bin"), 0755)
 	plugindir := filepath.Join(path, ".carpoplugins")
 	err := os.Mkdir(plugindir, 0755)
 	if err != nil && !os.IsExist(err) {

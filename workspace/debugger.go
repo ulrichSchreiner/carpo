@@ -4,6 +4,7 @@ import (
 	"code.google.com/p/go.net/websocket"
 	"encoding/json"
 	"fmt"
+	"github.com/ulrichSchreiner/carpo/workspace/filesystem"
 	"github.com/ulrichSchreiner/gdbmi"
 	"io"
 	"log"
@@ -19,8 +20,10 @@ const (
 
 type gdbjsonevent struct {
 	gdbmi.GDBEvent
-	TypeName string `json:"typeName"`
-	StopName string `json:"stopName"`
+	TypeName   string  `json:"typeName"`
+	StopName   string  `json:"stopName"`
+	Filesystem *string `json:"filesystem"`
+	Path       *string `json:"path"`
 }
 
 type message struct {
@@ -59,7 +62,7 @@ func (ws *workspace) breakpoints() []breakpoint {
 						if ok {
 							// add breakpoint only if filesystem is known
 							bp.source = fs.Abs(bpitem["source"].(string))
-							bp.line = int(bpitem["line"].(float64)) + 1
+							bp.line = int(bpitem["line"].(float64))
 							result = append(result, *bp)
 						}
 					}
@@ -139,13 +142,13 @@ func debugProcessHandler(wks *workspace) websocket.Handler {
 								log.Printf("exit received: %+v", ev)
 								gdb.Gdb_exit()
 								go func() {
-									clientqueue <- eventMessage(&ev)
+									clientqueue <- eventMessage(&ev, wks.filesystems)
 									quit <- true
 								}()
 								return
 							} else {
 								go func() {
-									clientqueue <- eventMessage(&ev)
+									clientqueue <- eventMessage(&ev, wks.filesystems)
 								}()
 							}
 						}
@@ -187,7 +190,15 @@ func targetConsoleMessage(ev *gdbmi.GDBTargetConsoleEvent) message {
 	return message{ev_console, ev, nil}
 }
 
-func eventMessage(ev *gdbmi.GDBEvent) message {
-	jev := gdbjsonevent{*ev, ev.Type.String(), ev.StopReason.String()}
+func eventMessage(ev *gdbmi.GDBEvent, fs map[string]filesystem.WorkspaceFS) message {
+	jev := gdbjsonevent{*ev, ev.Type.String(), ev.StopReason.String(), nil, nil}
+	if ev.CurrentStackFrame != nil {
+		fs, rel, err := filesystem.FindFilesystem(ev.CurrentStackFrame.Fullname, fs)
+		if err == nil {
+			fsn := fs.Name()
+			jev.Filesystem = &fsn
+			jev.Path = &rel
+		}
+	}
 	return message{ev_async, nil, &jev}
 }

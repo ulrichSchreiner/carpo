@@ -63,6 +63,7 @@ type GoWorkspace struct {
 	Workdir        string
 	GoPath         []string
 	GoPathString   string
+	DefaultFS      filesystem.WorkspaceFS
 
 	// some private data
 	context            build.Context
@@ -119,15 +120,16 @@ func NewGoWorkspace(gobin string, wspath string, gocode *string, fs map[string]f
 		srcd.importer = g.importPackage
 		srcd.path = filepath.Join(src, "src")
 		filepath.Walk(srcd.path, srcd.walker)
+		fs := filesystem.NewFS(filepath.Base(src), filepath.Clean(src))
 		if i == 0 {
 			// first element in gopath is special
 			g.FirstPath = src
 			g.Workdir = filepath.Join(g.FirstPath, workdir)
 			// ignore error if directory exists
 			os.Mkdir(g.Workdir, 0755)
+			g.DefaultFS = fs
 		} else {
 		}
-		fs := filesystem.NewFS(filepath.Base(src), filepath.Clean(src))
 		g.filesystems[filepath.Base(src)] = fs
 		g.filesystemsOrdered = append(g.filesystemsOrdered, fs)
 	}

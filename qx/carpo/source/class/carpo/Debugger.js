@@ -3,8 +3,21 @@ qx.Class.define("carpo.Debugger", {
   construct : function(app) {
     this._sessions = {};
     this._app = app;
+    this._currentPos = null;
   },
   members : {
+    gotoLine : function (fs, path, line) {
+      if (this._currentPos) {
+        this._app.openFileAtLine(this._currentPos.filesystem, this._currentPos.path, -1);
+      }
+      if (fs) {
+        this._currentPos = {filesystem:fs, path:path, line:line};
+        this._app.openFileAtLine(fs, path, line);
+      } else {
+        this._currentPos = null;
+      }
+    },
+    
     setConfig : function (cfg) {
       this._debugConfig = cfg.debugger;
       this._breakpoints = cfg.debugger.breakpoints;
@@ -13,7 +26,7 @@ qx.Class.define("carpo.Debugger", {
       var bp = {
         filesystem : fs,
         source : src,
-        line : line
+        line : line 
       };
       var key = fs+src;
       if (!this._breakpoints[key]) {

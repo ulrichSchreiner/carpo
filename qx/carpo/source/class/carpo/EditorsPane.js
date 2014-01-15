@@ -125,16 +125,21 @@ qx.Class.define("carpo.EditorsPane",
                 self._workspace.loadFile (f.filesystem, f.path, function (data) {
                   self.__openEditor(f.filesystem, f.path, data.title, data.content, data.filemode);
                   load(lst, cb);
+                }, function (err) {
+                  load(lst, cb);
                 });  
               }
             };
             load (ofs, function () {
               if (current) {
                 var ed = self.getEditorFor(current.filesystem, current.path);
-                self.fireDataEvent("fileSelected",{name:ed.getFilename(),path:ed.getFilepath(),filesystem:ed.getFilesystem()});
-                self.__showEditor(ed);
+                if (ed) {
+                  self.fireDataEvent("fileSelected",{name:ed.getFilename(),path:ed.getFilepath(),filesystem:ed.getFilesystem()});
+                  self.__showEditor(ed);
+                }
               }
               self.__silent = false;
+              self.saveEditorState();
             });
           }
         },
