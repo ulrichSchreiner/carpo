@@ -110,6 +110,6 @@ qx.Class.define("carpo.Workspace",
     wizardCommandLine : function (data, cb) {
       var d  = this.__getresource("commandLine","POST","/workspace/wizard/commandLine", cb);
       d.commandLine({}, data);
-    },    
+    }
   }
 });

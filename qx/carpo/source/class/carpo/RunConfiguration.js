@@ -141,11 +141,11 @@ qx.Class.define("carpo.RunConfiguration", {
           var m = self.configList.getSelection()[0].getModel();
           var newval = e.getData();
           m.set(target,newval);
-        }
+        };
       },
       configmodel : function (c) {
         return qx.data.marshal.Json.createModel(c);
-      },
+      }
 
     }
 });
