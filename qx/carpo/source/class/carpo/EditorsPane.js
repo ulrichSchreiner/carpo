@@ -75,6 +75,7 @@ qx.Class.define("carpo.EditorsPane",
     construct : function(app, workspace, config)
     {
       this.base(arguments);
+      this.getChildControl("bar").setScrollStep(40);
       this._openeditors = {};
       this.setContentPadding(0,0,0,0);
       this._config = config;
@@ -163,11 +164,21 @@ qx.Class.define("carpo.EditorsPane",
           this.__silent = false;
         },
         
-        openEditor : function (fs, path, title, content, filemode) {
+        openEditor : function (fs, path, title, content, filemode, whenOpened) {
           var ed = this.__openEditor(fs, path, title, content, filemode);
           if (ed != this.getCurrentEditor()) {
+            this.addListenerOnce ("changeSelection", function (evt) {
+              console.log("SELECTION:",evt);
+              if (whenOpened) {
+                whenOpened (ed);
+              }
+            });
             this.showEditor(ed);
-            this.saveEditorState();
+            //this.saveEditorState();
+          } else {
+            if (whenOpened) {
+              whenOpened (ed);
+            }
           }
           return ed;
         },

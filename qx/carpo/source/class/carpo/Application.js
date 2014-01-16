@@ -231,7 +231,8 @@ qx.Class.define("carpo.Application",
       var app = this;
       this.workspace.loadFile (fs, path, function (data) {
           var ed = app.editors.openEditor(fs, path, data.title, data.content, data.filemode); 
-          if (ed) ed.highlightDebuggerLine(line);
+          //ed.jumpTo(line);
+          ed.highlightDebuggerLine(line);
       });          
     },
     
@@ -804,14 +805,6 @@ qx.Class.define("carpo.Application",
     },
     launchProcess : function (launch) {
       var service = {};
-      //service.launchconfig = launch;
-      //service.pid = null;
-      //service.output = "";
-      //service.debug = false;
-      //service.defaultname = launch.name;
-      //service.name = launch.name;
-      //service.session = null;
-      //var model = qx.data.marshal.Json.createModel(service);
       var session = new carpo.DebugSession(this.debugger, launch, "", false, launch.name, launch.name);
 
       var self = this;
@@ -851,20 +844,19 @@ qx.Class.define("carpo.Application",
     },
     debugProcess : function (launch) {
       var service = {};
-      //service.launchconfig = launch;
-      //service.pid = null;
-      //service.output = "";
-      //service.debug = true;
-      //service.defaultname = "DEBUG: "+launch.name;
-      //service.name = launch.name;
-      //service.session = null;
 
-      //var model = qx.data.marshal.Json.createModel(service);
       var session = new carpo.DebugSession(this.debugger, launch, "", true, "DEBUG: "+launch.name, launch.name);
       var self = this;
+      service.connectconsole = function (pid) {
+        var wsconsole = self.getWebsocket("debugconsole", {id:pid});
+        wsconsole.onmessage = function (e) {
+          session.message(e.data);
+        };
+        service.console = wsconsole;
+      };
+      
       service.connect = function() {
         var pid = "";
-        //var debugSession = null;
         var debugConsoleId = null;
         
         if(service.ws) { return; }
@@ -877,7 +869,7 @@ qx.Class.define("carpo.Application",
         ws.onclose = function (e) {
           session.setPid("");    
           session.setName(session.getDefaultname()+" [STOPPED]");
-          session.removeListenerById(debugConsoleId);
+          session.close();
           self.debugger.removeSession(session);
         };
   
@@ -890,16 +882,10 @@ qx.Class.define("carpo.Application",
               session.setName(session.getDefaultname()+" ["+session.getPid()+"]");
               self.debugger.addSession(session);
               session.setService(service);
-              //model.setSession(debugSession);
-              debugConsoleId = session.addListener("consoleOutput", function (e) {
-                var dat = e.getData();
-                console.log("consoleoutput: ", dat);
-                session.setOutput(session.getOutput()+dat.line+"\n");
-              });
+              service.connectconsole(session.getPid());
             }
           } else {
-            console.log("debug-message:",e.data);
-            session.message(e.data);
+            session.setOutput(session.getOutput()+e.data);
           }
         };
   
@@ -988,7 +974,6 @@ qx.Class.define("carpo.Application",
       });
 
       var head = new qx.ui.basic.Atom(title);
-      head.setDecorator("window-caption");
       popup.add(head);
       var filter = new qx.ui.form.TextField();
       popup.add(filter);
@@ -1029,7 +1014,6 @@ qx.Class.define("carpo.Application",
       }, this);
       if (withdesc) {
         var desc = new qx.ui.basic.Atom("<i>... Description ...</i>");
-        desc.setDecorator("inset");
         desc.setRich(true);
         popup.add(desc);
         list.getSelection().addListener("change", function (e) {

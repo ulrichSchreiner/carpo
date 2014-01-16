@@ -78,7 +78,7 @@ qx.Class.define("carpo.Debugger", {
     },
     
     _sendCommand : function (service, cmd) {
-      service.ws.send(qx.lang.Json.stringify(cmd));
+      service.console.send(qx.lang.Json.stringify(cmd));
     },
     cmd_run : function (service) {
       var cmd = {command:"run",params:{}};

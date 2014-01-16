@@ -24,6 +24,7 @@ qx.Class.define("carpo.DebugSession", {
   },
   members : {
     message : function (msg) {
+      //console.log("MESSAGE:",msg);
       var e = qx.lang.Json.parse(msg);
       var f = this["on_"+e.debuggerEvent];
       if (f) {
@@ -31,9 +32,12 @@ qx.Class.define("carpo.DebugSession", {
         f(e);
       }
     },
+    close : function () {
+      this.fireDataEvent ("debugEvent", {typeName:"close"});
+    },
     on_async : function (e) {
       var aevent = e.event;
-      console.log("async:",aevent,this);
+      //console.log("async:",aevent,this);
       this.fireDataEvent("debugEvent", aevent);
     },
     on_console : function (e) {

@@ -11,6 +11,7 @@ import (
 	_ "github.com/ulrichSchreiner/carpo/golang"
 	"github.com/ulrichSchreiner/carpo/workspace/builder"
 	"github.com/ulrichSchreiner/carpo/workspace/filesystem"
+	"github.com/ulrichSchreiner/gdbmi"
 	"go/format"
 	"io"
 	"io/ioutil"
@@ -634,9 +635,10 @@ type workspace struct {
 	goworkspace *builder.GoWorkspace
 	config      map[string]interface{}
 
-	processes   map[int]*os.Process
-	proclock    *sync.Mutex
-	filesystems map[string]filesystem.WorkspaceFS
+	processes    map[int]*os.Process
+	debugSession map[int]*gdbmi.GDB
+	proclock     *sync.Mutex
+	filesystems  map[string]filesystem.WorkspaceFS
 }
 
 type fileevent struct {
@@ -677,9 +679,10 @@ func NewWorkspace(path string) error {
 		os.Mkdir(filepath.Join(plugindir, "bin"), 0755)
 	}
 
-	w := workspace{path, plugindir, nil, nil, nil, nil, nil, nil, nil, new(sync.Mutex), make(map[string]filesystem.WorkspaceFS)}
+	w := workspace{path, plugindir, nil, nil, nil, nil, nil, nil, nil, nil, new(sync.Mutex), make(map[string]filesystem.WorkspaceFS)}
 	w.loadConfiguration()
 	w.processes = make(map[int]*os.Process)
+	w.debugSession = make(map[int]*gdbmi.GDB)
 
 	gopath, err := exec.LookPath("go")
 	if err != nil {
@@ -713,6 +716,7 @@ func NewWorkspace(path string) error {
 
 	http.Handle("/workspace/", logged(wsContainer))
 	http.Handle("/launch/", logged(websocket.Handler(launchProcessHandler(&w))))
+	http.Handle("/debugconsole/", logged(websocket.Handler(debugConsoleHandler(&w))))
 	http.Handle("/debug/", logged(websocket.Handler(debugProcessHandler(&w))))
 	//http.Handle("/wsworkspace", logged(websocket.Handler(workspaceHandler(&w))))
 	return nil

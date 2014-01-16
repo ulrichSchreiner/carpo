@@ -78,6 +78,7 @@ qx.Class.define("carpo.Editor",
           this.__ace.focus();
       },
       jumpTo : function (row, col) {
+        if (row <0) return;
         if (this.__ace) {
           var pos = {row:row-1,col:col};
           this.__ace.moveCursorToPosition(pos);
@@ -94,12 +95,12 @@ qx.Class.define("carpo.Editor",
         }
         if (!this.__ace) {
           this.__currentDebuggerLine = line;
+          this.__currentHiliteLine = line;
         } else {
-          if (line != -1)
-            this._currentDebuggerLine = this.__ace.getSession().highlightLines(line-1, line-1); //+1, "debugline");
-          //var Range = require("ace/range").Range;
-          //this._currentDebuggerLine = this.__ace.getSession().addMarker(new Range(line, 0, line+1, 0),"debugline", "line");
-          //this.__currentDebuggerLine = line;
+          if (line != -1) {
+            this.__ace.scrollToLine(line, true);
+            this._currentDebuggerLine = this.__ace.getSession().highlightLines(line-1, line-1);
+          }
         }
       },
       
@@ -294,10 +295,13 @@ qx.Class.define("carpo.Editor",
               session.setBreakpoint(b.line-1, " ace_breakpoint ") ; 
             });
           }
-          if (this.__currentEditorLine)
-            this.highlightDebuggerLine(this.__currentEditorLine);
+          if (this.__currentHiliteLine)
+            qx.event.Timer.once(function () {
+              this.highlightDebuggerLine(this.__currentHiliteLine);
+            },this,100);
             
-          this.__ace.on("guttermousedown", qx.lang.Function.bind(this.showGutterMenu, this));
+            
+          editor.on("guttermousedown", qx.lang.Function.bind(this.showGutterMenu, this));
           // append resize listener
           this.__editor.addListener("resize", function() {
             // use a timeout to let the layout queue apply its changes to the dom

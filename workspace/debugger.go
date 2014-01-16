@@ -27,9 +27,8 @@ type gdbjsonevent struct {
 }
 
 type message struct {
-	DebuggerEvent debugEvent                   `json:"debuggerEvent"`
-	Console       *gdbmi.GDBTargetConsoleEvent `json:"console"`
-	Event         *gdbjsonevent                `json:"event"`
+	DebuggerEvent debugEvent    `json:"debuggerEvent"`
+	Event         *gdbjsonevent `json:"event"`
 }
 
 type breakpoint struct {
@@ -93,6 +92,89 @@ func (ws *workspace) debug(lc *launchConfig) (*gdbmi.GDB, error) {
 	return gdb, nil
 }
 
+func debugConsoleHandler(wks *workspace) websocket.Handler {
+	return func(ws *websocket.Conn) {
+		location := ws.Config().Location.Path
+		parts := strings.Split(location, "/")
+		spid := parts[len(parts)-1]
+		var pid int
+		fmt.Sscanf(spid, "%d", &pid)
+		gdb := wks.debugSession[pid]
+		if gdb != nil {
+			clientqueue := make(chan interface{})
+			quit := make(chan bool)
+			enc := json.NewEncoder(ws)
+			go func() {
+				for {
+					select {
+					case m := <-clientqueue:
+						if err := enc.Encode(m); err != nil {
+							log.Printf("cannot json-encode message: %s (%+v)", err, m)
+						}
+					case <-quit:
+						close(clientqueue)
+						return
+					}
+				}
+			}()
+			go func() {
+				for {
+					select {
+					case ev := <-gdb.Event:
+						if ev.StopReason == gdbmi.Async_stopped_exited ||
+							ev.StopReason == gdbmi.Async_stopped_exited_normally ||
+							ev.StopReason == gdbmi.Async_stopped_exited_signalled {
+							log.Printf("exit received: %+v", ev)
+							gdb.Gdb_exit()
+							go func() {
+								clientqueue <- eventMessage(&ev, wks.filesystems)
+								quit <- true
+							}()
+							return
+						} else {
+							go func() {
+								clientqueue <- eventMessage(&ev, wks.filesystems)
+							}()
+						}
+					}
+				}
+			}()
+			dec := json.NewDecoder(ws)
+			go func() {
+				for {
+					var cmd breakpoint_cmd
+					err := dec.Decode(&cmd)
+					if err != nil {
+						log.Printf("Error reading client debugger command %+v", err)
+						return
+					}
+					log.Printf(" -> %+v", cmd)
+					switch cmd.Command {
+					case "run":
+						gdb.Exec_continue(true, false, nil)
+					case "next":
+						gdb.Exec_next(false)
+					case "step":
+						gdb.Exec_step(false)
+					case "return":
+						gdb.Exec_finish(false)
+					}
+				}
+			}()
+			if _, err := gdb.DebuggerProcess.Wait(); err != nil {
+				log.Printf("Error waiting for process: %s", err)
+			}
+			wks.removeProcess(gdb.DebuggerProcess)
+			delete(wks.debugSession, gdb.DebuggerProcess.Pid)
+		}
+	}
+}
+
+func fetchCurrentDebugState(gdb *gdbmi.GDB) {
+	// fetch current stack data
+	// stack-list-arguments
+}
+
 func debugProcessHandler(wks *workspace) websocket.Handler {
 	return func(ws *websocket.Conn) {
 		location := ws.Config().Location.Path
@@ -108,86 +190,15 @@ func debugProcessHandler(wks *workspace) websocket.Handler {
 				return
 			}
 			wks.putProcess(gdb.DebuggerProcess)
+			wks.debugSession[gdb.DebuggerProcess.Pid] = gdb
 			io.WriteString(ws, fmt.Sprintf("%d\n", gdb.DebuggerProcess.Pid))
 			_, err = gdb.Exec_run(false, nil)
 
 			if err == nil {
-				clientqueue := make(chan interface{})
-				quit := make(chan bool)
-				enc := json.NewEncoder(ws)
-				go func() {
-					for {
-						select {
-						case m := <-clientqueue:
-							if err = enc.Encode(m); err != nil {
-								log.Printf("cannot json-encode message: %s (%+v)", err, m)
-							}
-						case <-quit:
-							close(clientqueue)
-							return
-						}
-					}
-				}()
-				go func() {
-					for {
-						select {
-						case tev := <-gdb.Target:
-							go func() {
-								clientqueue <- targetConsoleMessage(&tev)
-							}()
-						case ev := <-gdb.Event:
-							if ev.StopReason == gdbmi.Async_stopped_exited ||
-								ev.StopReason == gdbmi.Async_stopped_exited_normally ||
-								ev.StopReason == gdbmi.Async_stopped_exited_signalled {
-								log.Printf("exit received: %+v", ev)
-								gdb.Gdb_exit()
-								go func() {
-									clientqueue <- eventMessage(&ev, wks.filesystems)
-									quit <- true
-								}()
-								return
-							} else {
-								go func() {
-									clientqueue <- eventMessage(&ev, wks.filesystems)
-								}()
-							}
-						}
-					}
-				}()
-				dec := json.NewDecoder(ws)
-				go func() {
-					for {
-						var cmd breakpoint_cmd
-						err := dec.Decode(&cmd)
-						if err != nil {
-							log.Printf("Error reading client debugger command %+v", err)
-							return
-						}
-						log.Printf(" -> %+v", cmd)
-						switch cmd.Command {
-						case "run":
-							gdb.Exec_continue(true, false, nil)
-						case "next":
-							gdb.Exec_next(false)
-						case "step":
-							gdb.Exec_step(false)
-						case "return":
-							gdb.Exec_return()
-						}
-					}
-				}()
+				io.Copy(ws, gdb.TargetConsoleOut)
 			}
-			if _, err = gdb.DebuggerProcess.Wait(); err != nil {
-				log.Printf("Error waiting for process: %s", err)
-			}
-			wks.removeProcess(gdb.DebuggerProcess)
-			log.Printf("LC '%+v' ended", lc)
 		}
 	}
-}
-
-func targetConsoleMessage(ev *gdbmi.GDBTargetConsoleEvent) message {
-	return message{ev_console, ev, nil}
 }
 
 func eventMessage(ev *gdbmi.GDBEvent, fs map[string]filesystem.WorkspaceFS) message {
@@ -200,5 +211,5 @@ func eventMessage(ev *gdbmi.GDBEvent, fs map[string]filesystem.WorkspaceFS) mess
 			jev.Path = &rel
 		}
 	}
-	return message{ev_async, nil, &jev}
+	return message{ev_async, &jev}
 }
