@@ -107,9 +107,9 @@ qx.Class.define("carpo.Workspace",
       var d = this.__getresource("queryRemotePackages","GET","/workspace/queryremotepackages", cb, errcb);
       d.queryRemotePackages({},"q="+n);
     },
-    wizardCommandLine : function (data, cb) {
-      var d  = this.__getresource("commandLine","POST","/workspace/wizard/commandLine", cb);
-      d.commandLine({}, data);
+    template : function (data, cb) {
+      var d  = this.__getresource("template","POST","/workspace/wizard/template", cb);
+      d.template({}, data);
     }
   }
 });

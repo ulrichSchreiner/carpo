@@ -60,7 +60,7 @@ func (w *workspace) register(container *restful.Container) {
 	ws.Route(ws.GET("/queryremotepackages").To(w.queryremotepackages).Writes(query_packages{}))
 	ws.Route(ws.GET("/process/{pid}/kill").To(w.killproc))
 	ws.Route(ws.GET("/exit").To(w.exitCarpo))
-	ws.Route(ws.POST("/wizard/commandLine").To(w.createCommandLineUtility).Reads(wizard_commandline{}))
+	ws.Route(ws.POST("/wizard/template").To(w.template).Reads(servertemplate{}).Writes(servertemplate_result{}))
 	container.Add(&ws)
 }
 

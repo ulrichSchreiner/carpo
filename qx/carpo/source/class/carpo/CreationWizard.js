@@ -58,6 +58,7 @@ qx.Class.define("carpo.CreationWizard", {
     members : {
       setupCreationPanels : function () {
         this._commandLineUtility();
+        this._simpleWebApp();
       },
       
       showPanel : function (pan) {
@@ -72,7 +73,8 @@ qx.Class.define("carpo.CreationWizard", {
           panel : panel,
           ok : onok,
           cancel : oncancel
-        };
+        };              
+
         var li = new qx.ui.form.ListItem(name);
         this.wizards.add(li);
       },
@@ -99,21 +101,68 @@ qx.Class.define("carpo.CreationWizard", {
         
         var self = this;
         this.registerPanel (title, groupBox, function () {
-          var doc = {
-            name : model.getName(),
-            importpath : model.getBaseimportpath()
-          };
-          self.workspace.wizardCommandLine (doc, function (res) {
-            self.application.build(null, function (rsp, hasErrors) {
-              var config = carpo.RunConfiguration.newConfig("999");
-              config.name = model.getName();
-              config.executable = "{{.Workspace}}/bin/"+config.name;
-              self.application.addRunconfiguration(config);
-              self.application.openFile(res.filesystem, res.path);
+          if (form.validate()) {
+            var doc = {
+              name : model.getName(),
+              importpath : model.getBaseimportpath(),
+              template : "cmdline"
+            };
+            self.workspace.template (doc, function (res) {
+              self.application.build(null, function (rsp, hasErrors) {
+                var config = carpo.RunConfiguration.newConfig("999");
+                config.name = model.getName();
+                config.executable = "{{.Workspace}}/bin/"+config.name;
+                self.application.addRunconfiguration(config);
+                self.application.openFile(res.filesystem, res.path);
+              });
             });
-          });
-          return true;
+            return true;
+          }
+          return false;
+        });
+      },
+      _simpleWebApp : function () {
+        var title = "Simple Webapp";
+        var groupBox = new qx.ui.groupbox.GroupBox();
+        groupBox.setLayout(new qx.ui.layout.Canvas());
+
+        // form
+        var form = new qx.ui.form.Form();
+
+        // add the form items
+        var nameTextfield = new qx.ui.form.TextField();
+        nameTextfield.setRequired(true);
+        nameTextfield.setWidth(300);
+        form.add(nameTextfield, "Name", null, "name");
+
+        form.add(new qx.ui.form.TextField(), "Base import path",null,"baseimportpath");
+        
+        groupBox.add(new qx.ui.form.renderer.Single(form));
+        var controller = new qx.data.controller.Form(null, form);
+        var model = controller.createModel();
+        
+        var self = this;
+        this.registerPanel (title, groupBox, function () {
+          if (form.validate()) {
+            var doc = {
+              name : model.getName(),
+              importpath : model.getBaseimportpath(),
+              template : "simplewebapp"
+            };
+            self.workspace.template (doc, function (res) {
+              self.application.build(null, function (rsp, hasErrors) {
+                var config = carpo.RunConfiguration.newConfig("999");
+                config.name = model.getName();
+                config.executable = "{{.Workspace}}/bin/"+config.name;
+                self.application.addRunconfiguration(config);
+                self.application.openFile(res.filesystem, res.path);
+              });
+            });
+            return true;
+          }
+          return false;
         });
       }
+      
     }
 });

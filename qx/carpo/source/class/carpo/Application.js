@@ -87,7 +87,7 @@ qx.Class.define("carpo.Application",
             .set({
                 allowGrowX:true,
                 allowGrowY:true,
-                decorator:null,
+                decorator:"main",
                 statusBarVisible:false
                 });
         this.compileroutput.getSelectionModel().setSelectionMode(qx.ui.table.selection.Model.SINGLE_INTERVAL_SELECTION);                
