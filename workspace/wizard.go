@@ -71,7 +71,6 @@ func (serv *workspace) createtemplate(rq *servertemplate, template string) (*ser
 	if err != nil {
 		return nil, fmt.Errorf("Error creating main.go: %s", err)
 	}
-	fmt.Printf("TEMPLATE: %s\n", template)
 	fl.Write([]byte(template))
 	fl.Close()
 	serv.goworkspace.BuildPackage(serv.goworkspace.DefaultFS, rq.ImportPath)

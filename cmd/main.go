@@ -6,6 +6,7 @@ import (
 	"github.com/ulrichSchreiner/carpo/client"
 	_ "github.com/ulrichSchreiner/carpo/parser"
 	"github.com/ulrichSchreiner/carpo/workspace"
+	"launchpad.net/loggo"
 	"log"
 	"net"
 	"net/http"
@@ -19,8 +20,14 @@ var clientpath = flag.String("clientpath", "", "the path to the client resource 
 var wks = flag.String("workspace", "", "the path to the workspace")
 var browser = flag.Bool("browser", false, "start a browser with the server URL")
 
+var logger = loggo.GetLogger("main")
+
 func main() {
 	flag.Parse()
+
+	loggo.ConfigureLoggers("<root>=TRACE; workspace.*=TRACE")
+	logger.Infof("carpo started at port %d...\n", *port)
+
 	ws := wks
 	if ws == nil {
 		wd, err := os.Getwd()
@@ -42,8 +49,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	fmt.Printf("carpo started at port %d...\n", *port)
 	if *browser {
 		startBrowser(fmt.Sprintf("http://localhost:%d", *port))
 	}

@@ -10,7 +10,6 @@ qx.Class.define("carpo.DebugSession", {
         service: {init: null}
   },
   events : {
-    "consoleOutput"   : "qx.event.type.Data",
     "debugEvent" : "qx.event.type.Data"
   },
   construct : function(dbg, lc, output, debug, defaultname, name ) {
@@ -21,8 +20,50 @@ qx.Class.define("carpo.DebugSession", {
     this.setDebug(debug);
     this.setDefaultname(defaultname);
     this.setName(name);
+    this._running = true;
   },
   members : {
+    stop : function (wkService) {
+      if (this.getDebug()) {
+        this.quitDebugSession();
+        this._running = false;
+      } else {
+        if (this.getPid() !== "") {
+          wkService.killproc(this.getPid());
+          this._running = false;
+        }
+      }
+    },
+    
+    isRunning : function () {
+      return this._running;
+    },
+    
+    send : function (msg) {
+      var srv = this.getService();
+      srv.console.send(qx.lang.Json.stringify(msg));
+    },
+    quitDebugSession : function () {
+      var cmd = {
+        command : "quit",
+        data : []
+      };
+      this.send(cmd);
+    },
+    addBreakpoint : function (bp) {
+      var cmd = {
+        command : "add-breakpoint",
+        data : bp
+      };
+      this.send(cmd);
+    },
+    removeBreakpoint : function (bp) {
+      var cmd = {
+        command : "remove-breakpoint",
+        data : bp
+      };
+      this.send(cmd);
+    },
     message : function (msg) {
       //console.log("MESSAGE:",msg);
       var e = qx.lang.Json.parse(msg);
@@ -40,9 +81,8 @@ qx.Class.define("carpo.DebugSession", {
       //console.log("async:",aevent,this);
       this.fireDataEvent("debugEvent", aevent);
     },
-    on_console : function (e) {
-      var cevent = e.console;
-      this.fireDataEvent("consoleOutput", cevent);
+    on_data : function (e) {
+      console.log(e.data);
     }
   }
 });

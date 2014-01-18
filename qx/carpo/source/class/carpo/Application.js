@@ -1,4 +1,6 @@
 /* ************************************************************************
+import (
+	"launchpad.net/loggo")
 
    Copyright:
 
@@ -229,11 +231,15 @@ qx.Class.define("carpo.Application",
     },
     openFileAtLine : function (fs, path, line) {
       var app = this;
-      this.workspace.loadFile (fs, path, function (data) {
+      var ed = this.editors.getEditorFor(fs, path);
+      if (!ed)
+        this.workspace.loadFile (fs, path, function (data) {
           var ed = app.editors.openEditor(fs, path, data.title, data.content, data.filemode); 
           //ed.jumpTo(line);
           ed.highlightDebuggerLine(line);
-      });          
+        });
+      else
+        ed.highlightDebuggerLine(line);
     },
     
     showStatusMessage : function (msg, pending) {
@@ -409,7 +415,6 @@ qx.Class.define("carpo.Application",
       processes.setMinWidth(250);
       this.processList = processes;
       var ctrl = new qx.data.controller.List(this.processes, processes, "name");
-      //processes.addListener ("changeSelection",this.processChanged, this);
       toolbar.add (processes, {flex:0});
       var stopButton = new qx.ui.form.Button(null,"icon/16/actions/process-stop.png");
       this.processes.bind("length", stopButton, "enabled", {
@@ -419,25 +424,14 @@ qx.Class.define("carpo.Application",
       });
       ctrl.bind("selection[0].output", output, "value");
       ctrl.bind("selection[0]", this.debugpanel, "currentSession");
-      /*ctrl.getSelection().addListener ("change", function (e) {
-        var d = e.getData();
-        if (d.type === "add")
-          this.debugpanel.setCurrentSession(d.added[0].getSession());
-        else if (d.type === "remove")
-          this.debugpanel.setCurrentSession(null);
-        //console.log(e.getData());
-      }, this);*/
-      //ctrl.bind("selection[0]", this.debugpanel, "currentSession");
-      
+
       stopButton.addListener ("execute", function (e) {
         var sel = processes.getSelection()[0];
         if (sel) sel = sel.getModel();
-        if (sel) {
-          if (sel.getPid() !== "")
-            this.workspace.killproc(sel.getPid());
-          else
-            this.processes.remove(sel);
-        }        
+        if (sel && sel.isRunning()) 
+          sel.stop (this.workspace);
+        else
+          this.processes.remove(sel);
       }, this);
       toolbar.add(stopButton);
       stopButton.setEnabled(false);
@@ -921,11 +915,14 @@ qx.Class.define("carpo.Application",
         ws.installPackage(val.getName(), function () {
           new carpo.Go(ed.getAceEditor().getValue()).addImport(ed.getAceEditor(), val.getName());
         });
-      }, function (filtvalue, data, list) {
+      }, function (filt, data, list) {
         data.removeAll();
+        filtvalue = filt.getValue();
         var re = null;
         if (filtvalue && filtvalue.length>2) {
           ws.queryRemotePackages (filtvalue, function (res) {
+            if (res && res.query && res.query !== filt.getValue())
+              return;
             if (res && res.packages) {
               res.packages.sort(function (a,b) {return (a.name<b.name)?-1:1});
               res.packages.forEach(function (r) {
@@ -941,14 +938,16 @@ qx.Class.define("carpo.Application",
       this.showFilteredPopup(evt, "Search Local Package", false, function(data) {
         ws.queryPackages (function (res) {
           res.packages.sort(function (a,b) {return (a.name<b.name)?-1:1});
+          data.removeAll();
           res.packages.forEach(function (r) {
             data.push(qx.data.marshal.Json.createModel(r,false));
           });
         });
       }, function (ed, val) {
         new carpo.Go(ed.getAceEditor().getValue()).addImport(ed.getAceEditor(), val.getName());
-      }, function (filtvalue, data, list) {
+      }, function (filt, data, list) {
         var re = null;
+        filtvalue = filt.getValue();
         if (filtvalue) {
           re = new RegExp(filtvalue, 'i');
         }
@@ -981,7 +980,7 @@ qx.Class.define("carpo.Application",
       var list = new qx.ui.list.List(data);
       list.setLabelPath("name");
       filter.addListener ("input", function (e) {
-        onfilterchange(filter.getValue(), data, list);
+        onfilterchange(filter, data, list);
       }, this);
       
       popup.add(list,{flex:1});

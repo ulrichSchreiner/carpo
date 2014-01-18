@@ -201,6 +201,10 @@ func (ws *GoWorkspace) env(key string) (root string, err error) {
 }
 
 func (ws *GoWorkspace) build(args ...string) (res string, err error) {
+	//-gcflags "-N -l"
+	buildargs := []string{"-gcflags", "-N -l"}
+
+	args = append(buildargs, args...)
 	res, err = ws.gocmd(ws.gobinpath, string(goCommand_build), ws.Workdir, args...)
 	if err == nil {
 		//res = res + "\n" + ws.buildtests(gobin, args...)

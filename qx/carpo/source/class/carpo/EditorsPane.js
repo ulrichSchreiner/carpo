@@ -168,7 +168,6 @@ qx.Class.define("carpo.EditorsPane",
           var ed = this.__openEditor(fs, path, title, content, filemode);
           if (ed != this.getCurrentEditor()) {
             this.addListenerOnce ("changeSelection", function (evt) {
-              console.log("SELECTION:",evt);
               if (whenOpened) {
                 whenOpened (ed);
               }

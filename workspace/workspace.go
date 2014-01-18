@@ -15,7 +15,7 @@ import (
 	"go/format"
 	"io"
 	"io/ioutil"
-	"log"
+	"launchpad.net/loggo"
 	"net/http"
 	"os"
 	"os/exec"
@@ -26,6 +26,8 @@ import (
 )
 
 type buildType string
+
+var workspaceLogger = loggo.GetLogger("workspace")
 
 const (
 	BUILD_GOLANG             = "golang"
@@ -82,6 +84,7 @@ type (
 		Descr string `json:"description"`
 	}
 	query_packages struct {
+		Query    string          `json:"query"`
 		Packages []query_package `json:"packages"`
 	}
 )
@@ -193,7 +196,7 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 			fres.BuildType = BUILD_GOLANG
 			output, _, err := serv.goworkspace.BuildPackage(fs, fp)
 			if err != nil {
-				log.Printf("ERROR: %s\n", err)
+				workspaceLogger.Errorf("%s", err)
 				fres.Message = err.Error()
 				fres.Ok = false
 			} else {
@@ -447,7 +450,7 @@ func (serv *workspace) loadConfiguration() {
 		defer f.Close()
 		err = json.NewDecoder(f).Decode(&serv.config)
 		if err != nil {
-			log.Printf("Cannot decode .carpo.json: %s", err)
+			workspaceLogger.Warningf("Cannot decode .carpo.json: %s", err)
 		} else {
 			_, ok := serv.config["name"]
 			if !ok {
@@ -477,7 +480,7 @@ func (serv *workspace) buildWorkspace(request *restful.Request, response *restfu
 	workspace := serv.goworkspace.WorkspaceFS()
 	output, _, err := serv.goworkspace.FullBuild(workspace, ignoredPackages)
 	if err != nil {
-		log.Printf("Build ERROR: %s\n", err)
+		workspaceLogger.Errorf("Build error: %s", err)
 		result.Message = err.Error()
 		result.Ok = false
 	} else {
@@ -570,6 +573,7 @@ func (serv *workspace) querypackages(request *restful.Request, response *restful
 func (serv *workspace) queryremotepackages(request *restful.Request, response *restful.Response) {
 	var result query_packages
 	q := request.QueryParameter("q")
+	result.Query = q
 	remote := serv.goworkspace.QueryRemotePackages(q)
 	for _, p := range remote.Results {
 		result.Packages = append(result.Packages, query_package{Name: p.Path, Descr: p.Synopsis})
@@ -652,7 +656,7 @@ type fileevent struct {
 
 func logged(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("%s %s %s", r.RemoteAddr, r.Method, r.URL)
+		workspaceLogger.Infof("%s %s %s", r.RemoteAddr, r.Method, r.URL)
 		handler.ServeHTTP(w, r)
 	})
 }
@@ -672,7 +676,7 @@ func NewWorkspace(path string) error {
 	plugindir := filepath.Join(path, ".carpoplugins")
 	err := os.Mkdir(plugindir, 0755)
 	if err != nil && !os.IsExist(err) {
-		log.Fatalf("cannot create subdirectory '.carpoplugins': %s", err)
+		workspaceLogger.Criticalf("cannot create subdirectory '.carpoplugins': %s", err)
 	} else {
 		os.Mkdir(filepath.Join(plugindir, "src"), 0755)
 		os.Mkdir(filepath.Join(plugindir, "pkg"), 0755)
@@ -686,26 +690,26 @@ func NewWorkspace(path string) error {
 
 	gopath, err := exec.LookPath("go")
 	if err != nil {
-		log.Printf("no go tool found in path: %s\n", err)
+		workspaceLogger.Infof("no go tool found in path: %s", err)
 	} else {
 		w.gotool = &gopath
-		log.Printf("go: %s", *w.gotool)
+		workspaceLogger.Infof("go: %s", *w.gotool)
 	}
 	goapppath, err := exec.LookPath("goapp")
 	if err != nil {
-		log.Printf("no goapp tool found in path: %s\n", err)
+		workspaceLogger.Infof("no goapp tool found in path: %s", err)
 	} else {
 		w.goapptool = &goapppath
-		log.Printf("goapp: %s", *w.goapptool)
+		workspaceLogger.Infof("goapp: %s", *w.goapptool)
 	}
 	gobinpath := w.gobinpath()
-	log.Printf("Workspace uses %s as go", *gobinpath)
+	workspaceLogger.Infof("Workspace uses %s as go", *gobinpath)
 	gocode, err := findInPluginsOrEnvironment(plugindir, "gocode")
 	if err != nil {
-		log.Printf("no gocode found in path: %s\n", err)
+		workspaceLogger.Infof("no gocode found in path: %s", err)
 	} else {
 		w.gocode = gocode
-		log.Printf("gocode: %s", *w.gocode)
+		workspaceLogger.Infof("gocode: %s", *w.gocode)
 	}
 
 	gws := builder.NewGoWorkspace(*gobinpath, path, w.gocode, w.filesystems)
@@ -737,7 +741,6 @@ func findInPluginsOrEnvironment(plugindir string, toolname string) (toolpath *st
 
 func transformEvent(ws *workspace, evt *fsnotify.FileEvent) (*fileevent, error) {
 	var fe fileevent
-	log.Printf("fsevent: %+v", evt)
 	fe.Name = evt.Name[len(ws.Path):]
 	fe.Created = evt.IsCreate()
 	fe.Deleted = evt.IsDelete()
@@ -767,26 +770,26 @@ func launchProcessHandler(wks *workspace) websocket.Handler {
 		launchid := parts[len(parts)-1]
 		lc, err := wks.getLaunchConfig(launchid)
 		if err != nil {
-			log.Printf("Error in launchProcessHandler: %v", err)
+			workspaceLogger.Errorf("Error in launchProcessHandler: %v", err)
 		} else {
 			cmd := wks.launch(lc)
 			stdout, err := cmd.StdoutPipe()
 			if err != nil {
-				log.Printf("Error no StdoutPipe: %s", err)
+				workspaceLogger.Errorf("no StdoutPipe: %s", err)
 				return
 			}
 			stderr, err := cmd.StderrPipe()
 			if err != nil {
-				log.Printf("Error no StderrPipe: %s", err)
+				workspaceLogger.Errorf("no StderrPipe: %s", err)
 				return
 			}
 			stdin, err := cmd.StdinPipe()
 			if err != nil {
-				log.Printf("Error no StdinPipe: %s", err)
+				workspaceLogger.Errorf("no StdinPipe: %s", err)
 				return
 			}
 			if err := cmd.Start(); err != nil {
-				log.Printf("Error when starting process: %s", err)
+				workspaceLogger.Errorf("when starting process: %s", err)
 				return
 			}
 			wks.putProcess(cmd.Process)
@@ -801,10 +804,10 @@ func launchProcessHandler(wks *workspace) websocket.Handler {
 				io.Copy(stdin, ws)
 			}()
 			if err := cmd.Wait(); err != nil {
-				log.Printf("Error waiting for process: %s", err)
+				workspaceLogger.Errorf("waiting for process: %s", err)
 			}
 			wks.removeProcess(cmd.Process)
-			log.Printf("LC '%+v' ended", lc)
+			workspaceLogger.Infof("LC '%+v' ended", lc)
 		}
 	}
 }
@@ -812,13 +815,13 @@ func workspaceHandler(works *workspace) websocket.Handler {
 	return func(ws *websocket.Conn) {
 		watcher, err := fsnotify.NewWatcher()
 		if err != nil {
-			log.Printf("Cannot create Watcher: %v\n", err)
+			workspaceLogger.Errorf("Cannot create Watcher: %v", err)
 			return
 		}
 		err = watcher.Watch(works.Path)
-		log.Printf("Start watching %s ...\n", works.Path)
+		workspaceLogger.Infof("Start watching %s ...", works.Path)
 		if err != nil {
-			log.Printf("Cannot start Watcher: %v\n", err)
+			workspaceLogger.Errorf("Cannot start Watcher: %v", err)
 			return
 		}
 		works.Watcher = watcher
@@ -828,7 +831,7 @@ func workspaceHandler(works *workspace) websocket.Handler {
 				//fmt.Fprintln(ws, "event:", ev)
 				fe, err := transformEvent(works, ev)
 				if err != nil {
-					log.Printf("Error transforming event: %v", err)
+					workspaceLogger.Errorf("Error transforming event: %v", err)
 				} else {
 					websocket.JSON.Send(ws, fe)
 				}

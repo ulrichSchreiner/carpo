@@ -34,11 +34,22 @@ qx.Class.define("carpo.Debugger", {
       } else {
         this._breakpoints[key].push(bp);
       }
+      for (var k in this._sessions) {
+        s = this._sessions[k];
+        s.addBreakpoint(bp);
+      }
       if (!dontsave)
         this._app.saveConfig();
     },
     removeBreakpoint : function (fs, src, line, dontsave) {
       var key = fs+src;
+      var removeBp = {
+        filesystem : fs, source: src, line:line
+      };
+      for (var k in this._sessions) {
+        s = this._sessions[k];
+        s.removeBreakpoint(removeBp);
+      }
       var bps = this._breakpoints[key];
       if (bps) {
         for (var i=0; i<bps.length; i++) {
@@ -81,7 +92,7 @@ qx.Class.define("carpo.Debugger", {
       service.console.send(qx.lang.Json.stringify(cmd));
     },
     cmd_run : function (service) {
-      var cmd = {command:"run",params:{}};
+      var cmd = {command:"continue",params:{}};
       this._sendCommand(service, cmd);
     },
     cmd_next : function (service) {
@@ -94,6 +105,10 @@ qx.Class.define("carpo.Debugger", {
     },
     cmd_return : function (service) {
       var cmd = {command:"return",params:{}};
+      this._sendCommand(service, cmd);
+    },
+    cmd_state : function (service) {
+      var cmd = {command:"state",params:{}};
       this._sendCommand(service, cmd);
     },
     cmd_getBreakpointInfo : function (service) {

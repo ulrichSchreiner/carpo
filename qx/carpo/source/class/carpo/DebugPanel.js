@@ -150,7 +150,8 @@ qx.Class.define("carpo.DebugPanel", {
       },
       onStopped : function (e) {
         this._pause.setEnabled(false);
-        if (e.getData().stopName === "exited-normally") {
+        var dat = e.getData();
+        if (dat.stopName === "exited-normally") {
           this._run.setEnabled(false);
           this.debugger.gotoLine(null);
         }
@@ -159,9 +160,15 @@ qx.Class.define("carpo.DebugPanel", {
           this._stepinto.setEnabled(true);
           this._stepover.setEnabled(true);
           this._stepout.setEnabled(true);
-          var dat = e.getData();
-          if (dat && dat.currentStackFrame)
-            this.debugger.gotoLine(dat.filesystem, dat.path, dat.currentStackFrame.line);
+          if (dat.stopName === "signal-received" && dat.signalName==="SIGINT" && dat.signalMeaning==="Interrupt") {
+            // we must interrupt the program when we set a breakpoint, otherwise we get an error from dbg :-(
+            // so we ignore this event here
+          } else {
+            if (dat && dat.currentStackFrame) {
+              this.debugger.gotoLine(dat.filesystem, dat.path, dat.currentStackFrame.line);
+              this.debugger.cmd_state(this.getDebugSession().getService());
+            }
+          }
         }
       }
     }
