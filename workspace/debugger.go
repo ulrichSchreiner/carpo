@@ -45,8 +45,14 @@ type breakpoint_cmd struct {
 	Data    json.RawMessage `json:"data"`
 }
 
+type stackframe struct {
+	gdbmi.StackFrame
+	Filesystem string `json:"filesystem"`
+	Path       string `json:"path"`
+}
+
 type debugger_state struct {
-	Frames    []gdbmi.StackFrame    `json:"frames"`
+	Frames    []stackframe          `json:"frames"`
 	Variables []gdbmi.FrameArgument `json:"variables"`
 }
 
@@ -184,7 +190,7 @@ func debugConsoleHandler(wks *workspace) websocket.Handler {
 							debuglogger.Errorf("cannot remove breakpoint: %s", er)
 						}
 					case "state":
-						st := fetchCurrentDebugState(gdb)
+						st := fetchCurrentDebugState(gdb, wks.filesystems)
 						clientqueue <- dataMessage(st)
 					}
 				}
@@ -253,17 +259,31 @@ func (wks *workspace) addBreakpoint(cmd *breakpoint_cmd, gdb *gdbmi.GDB) error {
 	return nil
 }
 
-func fetchCurrentDebugState(gdb *gdbmi.GDB) debugger_state {
+func fetchCurrentDebugState(gdb *gdbmi.GDB, fs map[string]filesystem.WorkspaceFS) debugger_state {
 	var state debugger_state
 	frames, err := gdb.Stack_list_allframes()
 	if err == nil {
-		state.Frames = *frames
+		sf := patchFrameSourceLocations(frames, fs)
+		state.Frames = *sf
 	}
 	vars, err := gdb.Stack_list_variables(gdbmi.ListType_all_values)
 	if err == nil {
 		state.Variables = *vars
 	}
 	return state
+}
+
+func patchFrameSourceLocations(frames *[]gdbmi.StackFrame, fs map[string]filesystem.WorkspaceFS) *[]stackframe {
+	res := make([]stackframe, len(*frames))
+	for i, fa := range *frames {
+		fs, rel, err := filesystem.FindFilesystem(fa.File, fs)
+		if err == nil {
+			res[i].StackFrame = fa
+			res[i].Filesystem = fs.Name()
+			res[i].Path = rel
+		}
+	}
+	return &res
 }
 
 func debugProcessHandler(wks *workspace) websocket.Handler {

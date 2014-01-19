@@ -10,7 +10,8 @@ qx.Class.define("carpo.DebugSession", {
         service: {init: null}
   },
   events : {
-    "debugEvent" : "qx.event.type.Data"
+    "debugEvent" : "qx.event.type.Data",
+    "debugDataEvent" : "qx.event.type.Data"
   },
   construct : function(dbg, lc, output, debug, defaultname, name ) {
     this.base(arguments);
@@ -82,7 +83,7 @@ qx.Class.define("carpo.DebugSession", {
       this.fireDataEvent("debugEvent", aevent);
     },
     on_data : function (e) {
-      console.log(e.data);
+      this.fireDataEvent("debugDataEvent", e.data);
     }
   }
 });

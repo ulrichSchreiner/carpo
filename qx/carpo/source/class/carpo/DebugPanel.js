@@ -46,29 +46,63 @@ qx.Class.define("carpo.DebugPanel", {
       data.add(callstack);
       
       locals.setLayout(new qx.ui.layout.VBox(0));
+      callstack.setLayout(new qx.ui.layout.VBox(0));
       
-      this.localsdata = new qx.ui.table.model.Simple();
-      var columns = [ "Name","Value" ];
-      this.localsdata.setColumns(columns);
-      var custom = {
+      this.createVariablesTable();
+      this.createCallstackTable();
+      
+      this.add (toolbar);
+      locals.add(this.localstable,{flex:1});
+      callstack.add(this.callstacktable,{flex:1});
+      
+      this.add (data, {flex:1});
+    },
+    members : {
+      createVariablesTable : function () {
+        this.localsdata = new qx.ui.table.model.Simple();
+        var columns = [ "Name","Value","Type" ];
+        this.localsdata.setColumns(columns);
+        var custom = {
           tableColumnModel : function(obj) {
               return new qx.ui.table.columnmodel.Resize(obj);
           }
-      };      
-      this.localstable = new qx.ui.table.Table(this.localsdata, custom)
+        };      
+        this.localstable = new qx.ui.table.Table(this.localsdata, custom)
           .set({
               allowGrowX:true,
               allowGrowY:true,
               decorator:"main",
               statusBarVisible:false
               });
+      },
+      createCallstackTable : function () {
+        this.callstackdata = new qx.ui.table.model.Simple();
+        var columns = [ "Function","Project","File","Line" ];
+        this.callstackdata.setColumns(columns);
+        var custom = {
+          tableColumnModel : function(obj) {
+              return new qx.ui.table.columnmodel.Resize(obj);
+          }
+        };      
+        this.callstackdata.setColumnSortable(0, false);
+        this.callstackdata.setColumnSortable(1, false);
+        this.callstackdata.setColumnSortable(2, false);
+        
+        this.callstacktable = new qx.ui.table.Table(this.callstackdata, custom)
+          .set({
+              allowGrowX:true,
+              allowGrowY:true,
+              decorator:"main",
+              statusBarVisible:false
+              });
+        this.callstacktable.addListener("cellDblclick", function (e) {
+            var row = e.getRow();
+            var data = this.callstackdata.getRowData(row);
+            console.log(data);
+        }, this);
+              
+      },
       
-      this.add (toolbar);
-      locals.add(this.localstable,{flex:1});
-      
-      this.add (data, {flex:1});
-    },
-    members : {
       createCommands : function () {
         this._run = new qx.ui.core.Command();
         this._run.addListener("execute", this.step_run, this);
@@ -109,6 +143,7 @@ qx.Class.define("carpo.DebugPanel", {
         var old = this.getDebugSession();
         if (old) {
           old.removeListenerById(this._listenerid);
+          old.removeListenerById(this._datalistenerid);
         }
         if (s === null) {
           this.setDebugSession(null);
@@ -116,6 +151,7 @@ qx.Class.define("carpo.DebugPanel", {
         }
         this.setDebugSession(s);
         this._listenerid = s.addListener("debugEvent", this.onDebuggerEvent, this);
+        this._datalistenerid = s.addListener("debugDataEvent", this.onDebugDataEvent, this);
       },
       
       onDebuggerEvent : function (e) {
@@ -132,12 +168,33 @@ qx.Class.define("carpo.DebugPanel", {
         }
       },
       
+      onDebugDataEvent : function (e) {
+        var d = e.getData();
+        if (d.variables) {
+          var data = [];
+          d.variables.forEach (function (v) {
+            data.push([v.name,v.value,v.type]);
+          });
+          this.localsdata.setData(data);
+        }
+        if (d.frames) {
+          var data = [];
+          d.frames.forEach(function(v) {
+            data.push([v.function,v.filesystem,v.path,v.line]);
+          });
+          this.callstackdata.setData(data);
+        }
+      },
+      
       onRunning : function (e) {
         this._pause.setEnabled(true);
         this._run.setEnabled(false);
         this._stepinto.setEnabled(false);
         this._stepover.setEnabled(false);
         this._stepout.setEnabled(false);
+        this.localsdata.setData([]);
+        this.callstackdata.setData([]);
+        this.debugger.gotoLine(null);
       },
       onClose : function (e) {
         this._pause.setEnabled(false);
@@ -147,6 +204,8 @@ qx.Class.define("carpo.DebugPanel", {
         this._stepout.setEnabled(false);
         this.debugger.gotoLine(null);
         this.setCurrentSession(null);
+        this.localsdata.setData([]);
+        this.callstackdata.setData([]);
       },
       onStopped : function (e) {
         this._pause.setEnabled(false);
