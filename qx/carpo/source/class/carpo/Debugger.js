@@ -35,7 +35,7 @@ qx.Class.define("carpo.Debugger", {
         this._breakpoints[key].push(bp);
       }
       for (var k in this._sessions) {
-        s = this._sessions[k];
+        var s = this._sessions[k];
         s.addBreakpoint(bp);
       }
       if (!dontsave)
@@ -47,7 +47,7 @@ qx.Class.define("carpo.Debugger", {
         filesystem : fs, source: src, line:line
       };
       for (var k in this._sessions) {
-        s = this._sessions[k];
+        var s = this._sessions[k];
         s.removeBreakpoint(removeBp);
       }
       var bps = this._breakpoints[key];

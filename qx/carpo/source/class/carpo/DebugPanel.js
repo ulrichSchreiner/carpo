@@ -98,6 +98,7 @@ qx.Class.define("carpo.DebugPanel", {
         this.callstacktable.addListener("cellDblclick", function (e) {
             var row = e.getRow();
             var data = this.callstackdata.getRowData(row);
+            this.application.openFileAtLine(data[1], data[2], parseInt(data[3], 10), true);
             console.log(data);
         }, this);
               
@@ -180,7 +181,7 @@ qx.Class.define("carpo.DebugPanel", {
         if (d.frames) {
           var data = [];
           d.frames.forEach(function(v) {
-            data.push([v.function,v.filesystem,v.path,v.line]);
+            data.push([v["function"],v.filesystem,v.path,v.line]);
           });
           this.callstackdata.setData(data);
         }

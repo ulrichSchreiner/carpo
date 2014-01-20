@@ -229,17 +229,22 @@ qx.Class.define("carpo.Application",
           app.showAnnotations();
       });          
     },
-    openFileAtLine : function (fs, path, line) {
+    openFileAtLine : function (fs, path, line, onlyopen) {
       var app = this;
       var ed = this.editors.getEditorFor(fs, path);
       if (!ed)
         this.workspace.loadFile (fs, path, function (data) {
           var ed = app.editors.openEditor(fs, path, data.title, data.content, data.filemode); 
-          //ed.jumpTo(line);
-          ed.highlightDebuggerLine(line);
+          if (!onlyopen)
+            ed.highlightDebuggerLine(line);
+          else
+            ed.jumpTo(line, 0);
         });
       else
-        ed.highlightDebuggerLine(line);
+        if (!onlyopen)
+          ed.highlightDebuggerLine(line);
+        else
+          ed.jumpTo(line,0);
     },
     
     showStatusMessage : function (msg, pending) {
@@ -332,7 +337,7 @@ qx.Class.define("carpo.Application",
         if (!config.browser) {
             config.browser = {};
             config.browser.filterpatterns = ["^\\..*","pkg|bin|^\\..*"];
-            config.browser.currentfilter = config.browser.filterpatterns[1];
+            config.browser.currentfilter = config.browser.filterpatterns[0];
         }
         if (!config.runconfig) {
           config.runconfig = {};
@@ -917,7 +922,7 @@ qx.Class.define("carpo.Application",
         });
       }, function (filt, data, list) {
         data.removeAll();
-        filtvalue = filt.getValue();
+        var filtvalue = filt.getValue();
         var re = null;
         if (filtvalue && filtvalue.length>2) {
           ws.queryRemotePackages (filtvalue, function (res) {
@@ -947,7 +952,7 @@ qx.Class.define("carpo.Application",
         new carpo.Go(ed.getAceEditor().getValue()).addImport(ed.getAceEditor(), val.getName());
       }, function (filt, data, list) {
         var re = null;
-        filtvalue = filt.getValue();
+        var filtvalue = filt.getValue();
         if (filtvalue) {
           re = new RegExp(filtvalue, 'i');
         }

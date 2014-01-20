@@ -38,7 +38,8 @@ qx.Class.define("carpo.RunConfiguration", {
       var addButton = new qx.ui.form.Button(null,"icon/16/actions/list-add.png");
       toolbar.add(addButton);
       addButton.addListener ("click", function (e) {
-        this.data.push(new qx.data.marshal.Json.createModel(carpo.RunConfiguration.newConfig((new Date().getTime()))));
+        var config = carpo.RunConfiguration.newConfig((new Date().getTime()));
+        this.data.push(qx.data.marshal.Json.createModel(config));
       }, this);
       var removeButton = new qx.ui.form.Button(null,"icon/16/actions/list-remove.png");
       toolbar.add(removeButton);
