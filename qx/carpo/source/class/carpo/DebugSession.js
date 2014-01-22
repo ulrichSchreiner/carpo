@@ -31,8 +31,8 @@ qx.Class.define("carpo.DebugSession", {
       } else {
         if (this.getPid() !== "") {
           wkService.killproc(this.getPid());
-          this._running = false;
         }
+        this._running = false;
       }
     },
     
