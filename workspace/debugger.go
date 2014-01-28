@@ -93,6 +93,9 @@ func (ws *workspace) debug(lc *launchConfig) (*gdbmi.GDB, error) {
 		debuglogger.Errorf("error start target: %+v", err)
 		return nil, err
 	}
+	if len(lc.parameters) > 0 {
+		gdb.Exec_arguments(lc.parameters...)
+	}
 	_, err := gdb.SetAsync()
 	if err != nil {
 		debuglogger.Errorf("cannot set async mode: %s", err)
