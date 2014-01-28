@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
-rm dist/carpo
-rm dist/app.zip
+rm -f dist/carpo
+rm -f dist/app.zip
 go build -o dist/carpo_raw
 cd ../qx/carpo
 ./generate build
