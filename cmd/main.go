@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"github.com/ulrichSchreiner/carpo/client"
-	_ "github.com/ulrichSchreiner/carpo/parser"
 	"github.com/ulrichSchreiner/carpo/workspace"
 	"launchpad.net/loggo"
 	"log"
@@ -19,6 +18,7 @@ var port = flag.Int("port", 8787, "the port to use for carpo")
 var clientpath = flag.String("clientpath", "", "the path to the client resource directory (should contain an index.html file)")
 var wks = flag.String("workspace", "", "the path to the workspace")
 var browser = flag.Bool("browser", false, "start a browser with the server URL")
+var loglevel = flag.String("loglevel", "TRACE", "root loglevel")
 
 var carpo_version = "<latest>"
 
@@ -27,7 +27,7 @@ var logger = loggo.GetLogger("main")
 func main() {
 	flag.Parse()
 
-	loggo.ConfigureLoggers("<root>=TRACE; workspace.*=TRACE")
+	loggo.ConfigureLoggers(fmt.Sprintf("<root>=%s", *loglevel))
 	logger.Infof("carpo '%s' started at port %d...\n", carpo_version, *port)
 
 	ws := wks

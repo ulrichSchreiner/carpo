@@ -9,7 +9,6 @@ import (
 	"go/build"
 	"go/parser"
 	"go/token"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -253,7 +252,7 @@ func (ws *GoWorkspace) parseBuildTypedOutput(base filesystem.WorkspaceFS, output
 			br.Type = etype
 			fs, pt, err := ws.search(base, ws.Workdir, br.Source)
 			if err != nil {
-				log.Printf("cannot parse buildresult : %s", err)
+				buildLogger.Errorf("cannot parse buildresult : %s", err)
 				br.File = br.Source
 			} else {
 				br.File = pt
@@ -263,7 +262,7 @@ func (ws *GoWorkspace) parseBuildTypedOutput(base filesystem.WorkspaceFS, output
 			br.Directory = filepath.Dir(br.File)
 			pt, err = ws.findPackageFromDirectory(filepath.Join(base.Base(), br.Directory))
 			if err != nil {
-				log.Printf("cannot find package for directory '%s': %s", br.Directory, err)
+				buildLogger.Errorf("cannot find package for directory '%s': %s", br.Directory, err)
 			} else {
 				br.PackageImportPath = pt
 			}
@@ -271,7 +270,7 @@ func (ws *GoWorkspace) parseBuildTypedOutput(base filesystem.WorkspaceFS, output
 			sourceline := strings.Split(string(m[2]), ":")[0]
 			ln, err := strconv.ParseInt(sourceline, 10, 0)
 			if err != nil {
-				log.Printf("Compiler output line cannot be parsed as INT: Output=%s, Message=%s\n", l, err)
+				buildLogger.Errorf("Compiler output line cannot be parsed as INT: Output=%s, Message=%s\n", l, err)
 			} else {
 				br.Line = int(ln)
 			}

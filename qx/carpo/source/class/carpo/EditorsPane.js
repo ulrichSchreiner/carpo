@@ -181,6 +181,16 @@ qx.Class.define("carpo.EditorsPane",
           }
           return ed;
         },
+        closeAll : function () {
+          this.__silent = true;
+          for (var ed in this._openeditors) {
+            var editor = this._openeditors[ed];
+            this.remove(editor);
+          }
+          this._openeditors = {};
+          this.__silent = false;
+          this.saveEditorState();
+        },
         
         __openEditor : function (fs, path, title, content, filemode) {
           var ed = this._openeditors[fs+":"+path];

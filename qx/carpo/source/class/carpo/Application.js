@@ -391,6 +391,8 @@ qx.Class.define("carpo.Application",
     createCommands : function () {
         this._saveCommand = new qx.ui.core.Command("Ctrl+S");
         this._saveCommand.addListener("execute", this.saveFile, this);
+        this._closeAllCommand = new qx.ui.core.Command ();
+        this._closeAllCommand.addListener("execute", this.closeAll, this);
         this._settingsCommand = new qx.ui.core.Command();
         this._settingsCommand.addListener("execute", this.showSettings, this);
         this._buildCommand = new qx.ui.core.Command("Ctrl-B");
@@ -565,7 +567,7 @@ qx.Class.define("carpo.Application",
         
         var newButton = new qx.ui.menu.Button("New", null, null, this.getNewMenu());
         //var openButton = new qx.ui.menu.Button("Open", "icon/16/actions/document-open.png", this._openCommand);
-        //var closeButton = new qx.ui.menu.Button("Close");
+        var closeAllButton = new qx.ui.menu.Button("Close all", null, this._closeAllCommand);
         var saveButton = new qx.ui.menu.Button("Save", "icon/16/actions/document-save.png", this._saveCommand);
         var saveAllButton = new qx.ui.menu.Button ("Save all", null, this._saveAllCommand);
         //var saveAsButton = new qx.ui.menu.Button("Save as...", "icon/16/actions/document-save-as.png");
@@ -586,6 +588,7 @@ qx.Class.define("carpo.Application",
         menu.add(newButton);
         menu.add(saveButton);
         menu.add(saveAllButton);
+        menu.add(closeAllButton);
         //menu.add(saveAsButton);
         //menu.add(printButton);
         menu.add(exitButton);
@@ -651,6 +654,9 @@ qx.Class.define("carpo.Application",
         }
       }
       this.saveConfig(); // save new breakpoints
+    },
+    closeAll : function () {
+      this.editors.closeAll();
     },
     build : function (evt, cb) {
         var config = this.getConfig();

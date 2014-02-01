@@ -7,7 +7,7 @@ import (
 	"github.com/ulrichSchreiner/carpo/workspace/filesystem"
 	"go/build"
 	"io/ioutil"
-	"log"
+	"launchpad.net/loggo"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +15,8 @@ import (
 )
 
 type BuildResultType string
+
+var buildLogger = loggo.GetLogger("builder")
 
 const (
 	BUILD_ERROR   BuildResultType = "error"
@@ -103,7 +105,7 @@ func NewGoWorkspace(gobin string, wspath string, gocode *string, fs map[string]f
 	g.GoPath = filepath.SplitList(gopath)
 	goroot, err := g.env("GOROOT")
 	if err != nil {
-		log.Printf("no system packages found, cannot detect GOROOT from '%s': %s", gobin, err)
+		buildLogger.Errorf("no system packages found, cannot detect GOROOT from '%s': %s", gobin, err)
 	} else {
 		g.filesystems["GOROOT"] = filesystem.NewFS("GOROOT", filepath.Clean(goroot))
 		srcSystem := new(srcDir)
@@ -114,7 +116,6 @@ func NewGoWorkspace(gobin string, wspath string, gocode *string, fs map[string]f
 	g.context.GOROOT = goroot
 	g.context.GOARCH, _ = g.env("GOARCH")
 	g.context.GOOS, _ = g.env("GOOS")
-	log.Printf("CONTEXT:%+v", g.context)
 	for i, src := range g.GoPath {
 		srcd := new(srcDir)
 		srcd.importer = g.importPackage
@@ -215,7 +216,7 @@ func (ws *GoWorkspace) FullBuild(base filesystem.WorkspaceFS, ignoredPackages ma
 			dirs = append(dirs, ws.findDirectoryFromPackage(p))
 		}
 	}
-	log.Printf("full build with %+v", args)
+	buildLogger.Debugf("full build with %+v", args)
 	res, err := ws.build(args...)
 	if err != nil {
 		return nil, nil, err
@@ -244,7 +245,7 @@ func (ws *GoWorkspace) InstallPackage(pkg string, plugindir string) (err error) 
 		fmt.Sprintf("GOPATH=%s", ws.GoPathString),
 		os.ExpandEnv("PATH=$PATH"), // git must be installed!
 	}
-	log.Printf("install %s: %+v", pkg, cmd)
+	buildLogger.Infof("install %s: %+v", pkg, cmd)
 	_, err = cmd.CombinedOutput()
 	return err
 }
@@ -256,7 +257,7 @@ func (ws *GoWorkspace) InstallGocode(plugindir string) (gocodebinpath *string, e
 		fmt.Sprintf("GOPATH=%s", plugindir),
 		os.ExpandEnv("PATH=$PATH"), // git must be installed!
 	}
-	log.Printf("install gocode: %+v", cmd)
+	buildLogger.Infof("install gocode: %+v", cmd)
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		gopath := filepath.Join(plugindir, "bin", "gocode")
@@ -295,30 +296,30 @@ func (ws *GoWorkspace) Autocomplete(gocodebin *string, content string, path stri
 		fmt.Sprintf("GOOS=%s", ws.context.GOOS)}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Printf("Error no StdoutPipe: %s", err)
+		buildLogger.Errorf("Error no StdoutPipe: %s", err)
 		return
 	}
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		log.Printf("Error no StdinPipe: %s", err)
+		buildLogger.Errorf("Error no StdinPipe: %s", err)
 		return
 	}
 	if err = cmd.Start(); err != nil {
-		log.Printf("Error when starting gocode process: %s", err)
+		buildLogger.Errorf("Error when starting gocode process: %s", err)
 		return
 	}
 	stdin.Write([]byte(content))
 	stdin.Close()
 	out, err := ioutil.ReadAll(stdout)
 	if err != nil {
-		log.Printf("Error reading from stdout: %s", err)
+		buildLogger.Errorf("Error reading from stdout: %s", err)
 		return
 	}
 	cmd.Wait()
 	var found []interface{}
 	err = json.Unmarshal(out, &found)
 	if err != nil {
-		log.Printf("Error parsing gocode output:%s", err)
+		buildLogger.Errorf("Error parsing gocode output:%s", err)
 		return
 	}
 	ignore, err := ws.findImportsInCode(content)
@@ -342,7 +343,7 @@ func (ws *GoWorkspace) Autocomplete(gocodebin *string, content string, path stri
 		}
 		sug = append(sug, Suggestion{})
 	} else {
-		log.Printf("cannot find unresolved: %s", err2)
+		buildLogger.Errorf("cannot find unresolved: %s", err2)
 	}
 	if len(found) > 0 {
 		// first element is the number of matching chars --> ignore it

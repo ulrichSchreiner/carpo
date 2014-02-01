@@ -7,8 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/emicklei/go-restful"
-	"github.com/howeyc/fsnotify"
-	_ "github.com/ulrichSchreiner/carpo/golang"
+	// "github.com/howeyc/fsnotify"
 	"github.com/ulrichSchreiner/carpo/workspace/builder"
 	"github.com/ulrichSchreiner/carpo/workspace/filesystem"
 	"github.com/ulrichSchreiner/gdbmi"
@@ -630,9 +629,9 @@ func sendError(response *restful.Response, status int, err error) {
 }
 
 type workspace struct {
-	Path        string
-	plugindir   string
-	Watcher     *fsnotify.Watcher
+	Path      string
+	plugindir string
+	//Watcher     *fsnotify.Watcher
 	gotool      *string
 	goapptool   *string
 	gocode      *string
@@ -683,7 +682,7 @@ func NewWorkspace(path string) error {
 		os.Mkdir(filepath.Join(plugindir, "bin"), 0755)
 	}
 
-	w := workspace{path, plugindir, nil, nil, nil, nil, nil, nil, nil, nil, new(sync.Mutex), make(map[string]filesystem.WorkspaceFS)}
+	w := workspace{path, plugindir, nil, nil, nil, nil, nil, nil, nil, new(sync.Mutex), make(map[string]filesystem.WorkspaceFS)}
 	w.loadConfiguration()
 	w.processes = make(map[int]*os.Process)
 	w.debugSession = make(map[int]*gdbmi.GDB)
@@ -739,6 +738,7 @@ func findInPluginsOrEnvironment(plugindir string, toolname string) (toolpath *st
 	return &tool, nil
 }
 
+/*
 func transformEvent(ws *workspace, evt *fsnotify.FileEvent) (*fileevent, error) {
 	var fe fileevent
 	fe.Name = evt.Name[len(ws.Path):]
@@ -763,6 +763,7 @@ func transformEvent(ws *workspace, evt *fsnotify.FileEvent) (*fileevent, error) 
 	}
 	return &fe, nil
 }
+*/
 func launchProcessHandler(wks *workspace) websocket.Handler {
 	return func(ws *websocket.Conn) {
 		location := ws.Config().Location.Path
@@ -811,6 +812,8 @@ func launchProcessHandler(wks *workspace) websocket.Handler {
 		}
 	}
 }
+
+/*
 func workspaceHandler(works *workspace) websocket.Handler {
 	return func(ws *websocket.Conn) {
 		watcher, err := fsnotify.NewWatcher()
@@ -842,3 +845,4 @@ func workspaceHandler(works *workspace) websocket.Handler {
 		}
 	}
 }
+*/
