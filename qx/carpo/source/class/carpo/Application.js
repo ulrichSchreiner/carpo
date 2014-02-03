@@ -55,7 +55,10 @@ qx.Class.define("carpo.Application",
         }
         this.workspace = new carpo.Workspace(this);
         this.debugger = new carpo.Debugger(this);
-        carpo.EditorsPane.loadAce(qx.lang.Function.bind(this.init, this));
+        var initfunc = qx.lang.Function.bind(this.init, this)
+        this.workspace.resetWorkspace(function () {
+          carpo.EditorsPane.loadAce(initfunc);
+        });
     },
 
     init : function () {

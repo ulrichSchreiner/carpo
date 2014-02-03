@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"text/template"
 )
 
@@ -50,6 +51,7 @@ func (ws *workspace) launch(lc *launchConfig) *exec.Cmd {
 	cmd := exec.Command(lc.executable, lc.parameters...)
 	cmd.Dir = lc.workingDirectory
 	cmd.Env = lc.environment
+	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: 9}
 	return cmd
 }
 

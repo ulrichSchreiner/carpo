@@ -5,8 +5,9 @@ qx.Class.define("carpo.Workspace",
     this.status = stat;
   },
   members : {
-    __getresource : function (act, httpAction, path, cb,errcb,ct) {
-      this.status.showStatusMessage ("waiting <code>"+act+"</code> ...", true);
+    __getresource : function (act, httpAction, path, cb,errcb,ct,silent) {
+      if (!silent)
+        this.status.showStatusMessage ("waiting <code>"+act+"</code> ...", true);
       var d = new qx.io.rest.Resource();
       var self = this;
       d.map(act, httpAction, path);
@@ -17,14 +18,16 @@ qx.Class.define("carpo.Workspace",
           req.setRequestHeader("Accept","*/*");
       });
       d.addListener("success", function(e) {
+        if (!silent)
           self.status.showStatusMessage("Ok!", false);
-          if (cb)
-            cb(e.getData());
+        if (cb)
+          cb(e.getData());
       }, this);
       d.addListener("error", function(e) {
+        if (!silent)
           self.status.showStatusMessage("Error!", false);
-          if (errcb)
-              errcb(e);
+        if (errcb)
+            errcb(e);
       }, this);
       return d;
     },
@@ -45,6 +48,11 @@ qx.Class.define("carpo.Workspace",
     loadconfig : function (cb,errcb) {
       var d = this.__getresource("loadconfig","GET","/workspace/config", cb,errcb);
       d.loadconfig();
+    },
+
+    resetWorkspace : function (cb,errcb) {
+      var d = this.__getresource("resetWS","GET","/workspace/reset", cb,errcb,null,true);
+      d.resetWS();
     },
     
     loadEnvironment : function (cb,errcb) {

@@ -44,6 +44,7 @@ func (w *workspace) register(container *restful.Container) {
 		Path("/workspace").
 		Consumes(restful.MIME_JSON).
 		Produces(restful.MIME_JSON)
+	ws.Route(ws.GET("/reset").To(w.reset))
 	ws.Route(ws.POST("/dir").To(w.dir).Reads(dirRequest{}).Writes(dir{}))
 	ws.Route(ws.POST("/mkdir").To(w.createdir).Reads(dirRequest{}).Writes(dir{}))
 	ws.Route(ws.POST("/touch").To(w.touch).Reads(fileReadRequest{}).Writes(dir{}))
@@ -409,6 +410,16 @@ func (serv *workspace) saveConfig(request *restful.Request, response *restful.Re
 
 func (serv *workspace) loadConfig(request *restful.Request, response *restful.Response) {
 	json.NewEncoder(response).Encode(serv.config)
+}
+
+func (serv *workspace) reset(request *restful.Request, response *restful.Response) {
+	workspaceLogger.Infof("Reset workspace")
+	for pid, _ := range serv.processes {
+		serv.killProcess(pid)
+	}
+	for _, s := range serv.debugSession {
+		go s.Gdb_exit()
+	}
 }
 
 func (serv *workspace) loadEnvironment(request *restful.Request, response *restful.Response) {
