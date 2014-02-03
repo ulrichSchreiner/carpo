@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"time"
 )
 
 var port = flag.Int("port", 8787, "the port to use for carpo")
@@ -20,7 +21,7 @@ var wks = flag.String("workspace", "", "the path to the workspace")
 var browser = flag.Bool("browser", false, "start a browser with the server URL")
 var loglevel = flag.String("loglevel", "TRACE", "root loglevel")
 
-var carpo_version = "<latest>"
+var carpo_version string
 
 var logger = loggo.GetLogger("main")
 
@@ -28,6 +29,9 @@ func main() {
 	flag.Parse()
 
 	loggo.ConfigureLoggers(fmt.Sprintf("<root>=%s", *loglevel))
+	if carpo_version == "" {
+		carpo_version = fmt.Sprintf("%d", time.Now().Unix())
+	}
 	logger.Infof("carpo '%s' started at port %d...\n", carpo_version, *port)
 
 	ws := wks
@@ -43,7 +47,7 @@ func main() {
 	} else {
 		client.InitResources()
 	}
-	err := workspace.NewWorkspace(*ws)
+	err := workspace.NewWorkspace(*ws, carpo_version)
 	if err != nil {
 		log.Fatal(err)
 	}

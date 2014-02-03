@@ -543,7 +543,7 @@ qx.Class.define("carpo.Application",
         //var searchMenu = new qx.ui.menubar.Button("Search", null, this.getSearchMenu());
         //var viewMenu = new qx.ui.menubar.Button("View", null, this.getViewMenu());
         //var formatMenu = new qx.ui.menubar.Button("Format", null, this.getFormatMenu());
-        //var helpMenu = new qx.ui.menubar.Button("Help", null, this.getHelpMenu());
+        var helpMenu = new qx.ui.menubar.Button("Help", null, this.getHelpMenu());
         
         menubar.add(fileMenu);
         menubar.add(viewMenu);
@@ -554,7 +554,7 @@ qx.Class.define("carpo.Application",
         //menubar.add(searchMenu);
         //menubar.add(viewMenu);
         //menubar.add(formatMenu);
-        //menubar.add(helpMenu);
+        menubar.add(helpMenu);
         
         return frame;
     },
@@ -565,6 +565,19 @@ qx.Class.define("carpo.Application",
         menu.add(settings);
         return menu;
     },
+    
+    getHelpMenu : function () {
+        var menu = new qx.ui.menu.Menu();
+        var settings = new qx.ui.menu.Button("Version",null);
+        settings.addListener("execute", function () {
+          var d = new Date();
+          d.setTime(this.getConfig().carpoversion*1000);
+          alert("Version: "+d);
+        }, this);
+        menu.add(settings);
+        return menu;
+    },
+    
     getFileMenu : function() {
         var menu = new qx.ui.menu.Menu();
         

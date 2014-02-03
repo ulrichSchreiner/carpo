@@ -409,6 +409,7 @@ func (serv *workspace) saveConfig(request *restful.Request, response *restful.Re
 }
 
 func (serv *workspace) loadConfig(request *restful.Request, response *restful.Response) {
+	serv.config["carpoversion"] = serv.Version
 	json.NewEncoder(response).Encode(serv.config)
 }
 
@@ -640,6 +641,7 @@ func sendError(response *restful.Response, status int, err error) {
 }
 
 type workspace struct {
+	Version   string
 	Path      string
 	plugindir string
 	//Watcher     *fsnotify.Watcher
@@ -671,7 +673,7 @@ func logged(handler http.Handler) http.Handler {
 	})
 }
 
-func NewWorkspace(path string) error {
+func NewWorkspace(path string, version string) error {
 	if !filepath.IsAbs(path) {
 		workdir, err := os.Getwd()
 		if err != nil {
@@ -693,7 +695,7 @@ func NewWorkspace(path string) error {
 		os.Mkdir(filepath.Join(plugindir, "bin"), 0755)
 	}
 
-	w := workspace{path, plugindir, nil, nil, nil, nil, nil, nil, nil, new(sync.Mutex), make(map[string]filesystem.WorkspaceFS)}
+	w := workspace{version, path, plugindir, nil, nil, nil, nil, nil, nil, nil, new(sync.Mutex), make(map[string]filesystem.WorkspaceFS)}
 	w.loadConfiguration()
 	w.processes = make(map[int]*os.Process)
 	w.debugSession = make(map[int]*gdbmi.GDB)
