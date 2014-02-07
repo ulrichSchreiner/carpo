@@ -715,7 +715,15 @@ func NewWorkspace(path string, version string) error {
 		workspaceLogger.Infof("goapp: %s", *w.goapptool)
 	}
 	gobinpath := w.gobinpath()
-	workspaceLogger.Infof("Workspace uses %s as go", *gobinpath)
+	if gobinpath != nil {
+		workspaceLogger.Infof("Workspace uses %s as go", *gobinpath)
+	} else {
+		if gopath != "" {
+			gobinpath = &gopath
+		} else {
+			return errors.New("Workspace uses nothing as go, no 'goapp' or 'go' als failover found")
+		}
+	}
 	gocode, err := findInPluginsOrEnvironment(plugindir, "gocode")
 	if err != nil {
 		workspaceLogger.Infof("no gocode found in path: %s", err)
