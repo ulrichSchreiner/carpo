@@ -80,6 +80,10 @@ qx.Class.define("carpo.Application",
             allowGrowY: true,
             allowGrowX: true
         });
+        var paneEditorStruct = new qx.ui.splitpane.Pane("horizontal").set({
+            allowGrowY: true,
+            allowGrowX: true
+        });
         this.compileroutputModel = new qx.ui.table.model.Simple();
         var columns = [ "","Project","Source", "Line", "Column","Message" ];
         this.compileroutputModel.setColumns(columns);
@@ -137,6 +141,7 @@ qx.Class.define("carpo.Application",
           var path = e.getData().path;
           var fs = e.getData().filesystem;
           fb.selectNode({path:path,fs:fs});
+          this.parseSource (e.getData().editor.getContent());
         }, this);
 
         var output = new qx.ui.tabview.TabView();
@@ -197,8 +202,39 @@ qx.Class.define("carpo.Application",
         resizeBehavior.setWidth(1, "70%");
         ignoredPackages.add(this.ignoredPackagesTable,{flex:1});
         output.add(ignoredPackages);
+        
+        this.sourceModel = qx.data.marshal.Json.createModel([]);
+        var sourceLayout = new qx.ui.list.List(this.sourceModel).set({
+          labelPath:"label",
+          iconPath: "icon",
+          iconOptions: {converter : function(data) {
+            return "carpo/"+data;
+          }}
+        });
+        var delegate = {
+          sorter : function(a, b) {
+            var as = a.getSort();
+            var bs = b.getSort();
+            if (as > bs) return 1;
+            if (as < bs) return -1;
+            return a.getName().localeCompare(b.getName());
+          }
+        };
+        sourceLayout.setDelegate(delegate);
+        sourceLayout.getSelection().addListener("change", function(e) {
+          var selection = sourceLayout.getSelection().getItem(0);
+          if (!selection) return;
+          var ed = this.editors.getCurrentEditor();
+          if (ed) {
+            ed.jumpTo(selection.getLine(), 0);
+          }
+        }, this);
+        
         pane.add(fb, 1);
-        pane2.add(this.editors,2);
+        paneEditorStruct.add(this.editors,5);
+        paneEditorStruct.add(sourceLayout);
+        //pane2.add(this.editors,2);
+        pane2.add(paneEditorStruct,2);
         pane2.add(output, 1);
         pane2.setDecorator(null);
         pane.add(pane2,4);
@@ -648,6 +684,10 @@ qx.Class.define("carpo.Application",
             var data = editor.getEditorData();
             data.build = true;
             this.workspace.saveFile(data.filesystem, data.path, data, function (rsp) {
+              if (rsp.parsed) {
+                app.sourceModel.removeAll();
+                app.showParseResult(rsp.parsed);
+              }
               editor.setEditorValue(rsp.formattedcontent, true);
               app.saveConfig(); // saves new breakpoints
               if (rsp.buildtype && rsp.buildtype == "golang")
@@ -1095,6 +1135,41 @@ qx.Class.define("carpo.Application",
       this.center(wiz);
       this.getRoot().add(wiz);
       wiz.show();
+    },
+    
+    parseSource : function (src) {
+      this.sourceModel.removeAll();
+      var show = qx.lang.Function.bind(this.showParseResult, this);
+      this.workspace.parseSource ({content:src}, show, function (e) {
+      });
+    },
+    
+    showParseResult : function (d) {
+      this.sourceModel.removeAll();
+      var mod = this.sourceModel;
+      for (var i=0; i<d.tokens.length; i++) {
+        var t = d.tokens[i];
+        var n = t.name;
+        if (t.target !== "") {
+          n = t.name+ " ["+t.target+"]";
+        }
+        var e = {
+          name : t.name,
+          label : n,
+          line : t.line,
+          type : t.tokentype
+        };
+        switch (t.tokentype) {
+          case "PACKAGE": e.icon = "package.gif"; e.sort=0; break;
+          case "IMPORT": e.icon = "import.png"; e.sort=1; break;
+          case "FUNC": e.icon = "function_public.gif"; e.sort=5; break;
+          case "METHOD": e.icon = "function_public.gif"; e.sort=5; break;
+          case "CONST": e.icon = "const.gif"; e.sort=2; break;
+          case "VAR": e.icon = "variable.gif"; e.sort=3; break;
+          case "TYPE": e.icon = "struct.gif"; e.sort=4; break;
+        }
+        mod.push( qx.data.marshal.Json.createModel(e));
+      }
     },
     
     debugButton : function (event) {

@@ -58,6 +58,7 @@ func (w *workspace) register(container *restful.Container) {
 	ws.Route(ws.GET("/install/package").To(w.installPackage))
 	ws.Route(ws.POST("/build").To(w.buildWorkspace).Reads(buildRequest{}).Writes(buildResponse{}))
 	ws.Route(ws.POST("/autocomplete").To(w.autocomplete).Reads(autocomplete{}).Writes(autocompleteResult{}))
+	ws.Route(ws.POST("/parseSource").To(w.parseSource).Reads(parsesource{}).Writes(parsesourceResult{}))
 	ws.Route(ws.GET("/querypackages").To(w.querypackages).Writes(query_packages{}))
 	ws.Route(ws.GET("/queryremotepackages").To(w.queryremotepackages).Writes(query_packages{}))
 	ws.Route(ws.GET("/process/{pid}/kill").To(w.killproc))
@@ -78,6 +79,16 @@ type (
 		Suggestions []builder.Suggestion `json:"suggestions"`
 	}
 )
+
+type (
+	parsesource struct {
+		Content string `json:"content"`
+	}
+	parsesourceResult struct {
+		Tokens []builder.TokenPosition `json:"tokens"`
+	}
+)
+
 type (
 	query_package struct {
 		Name  string `json:"name"`
@@ -145,7 +156,8 @@ type buildResponse struct {
 }
 type fileSaveResponse struct {
 	buildResponse
-	FormattedContent string `json:"formattedcontent"`
+	FormattedContent string             `json:"formattedcontent"`
+	Parsed           *parsesourceResult `json:"parsed"`
 }
 
 type WorkspaceConfiguration struct {
@@ -190,7 +202,7 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 	//fn := filepath.Base(path)
 	fp := filepath.Dir(path)
 	//golang.Parse(string(src), fn)
-	fres := fileSaveResponse{buildResponse{true, "File saved", "", []builder.BuildResult{}}, string(src)}
+	fres := fileSaveResponse{buildResponse{true, "File saved", "", []builder.BuildResult{}}, string(src), nil}
 	if rq.Build {
 		if strings.HasSuffix(strings.ToLower(rpath), ".go") {
 			fres.BuildType = BUILD_GOLANG
@@ -201,6 +213,10 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 				fres.Ok = false
 			} else {
 				fres.BuildOutput = *output
+			}
+			toks, err := builder.ParseSource(string(src))
+			if err == nil {
+				fres.Parsed = &parsesourceResult{Tokens: toks}
 			}
 		}
 	}
@@ -590,6 +606,21 @@ func (serv *workspace) queryremotepackages(request *restful.Request, response *r
 		result.Packages = append(result.Packages, query_package{Name: p.Path, Descr: p.Synopsis})
 	}
 	response.WriteEntity(result)
+}
+
+func (serv *workspace) parseSource(request *restful.Request, response *restful.Response) {
+	rq := new(parsesource)
+	err := request.ReadEntity(&rq)
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Error reading parsesource content: %s", err))
+		return
+	}
+	res, err := builder.ParseSource(rq.Content)
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Error parseing source content: %s", err))
+		return
+	}
+	response.WriteEntity(parsesourceResult{res})
 }
 
 func (serv *workspace) autocomplete(request *restful.Request, response *restful.Response) {

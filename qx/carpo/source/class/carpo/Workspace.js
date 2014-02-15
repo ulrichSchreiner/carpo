@@ -118,6 +118,10 @@ qx.Class.define("carpo.Workspace",
     template : function (data, cb) {
       var d  = this.__getresource("template","POST","/workspace/wizard/template", cb);
       d.template({}, data);
+    },
+    parseSource : function (data, cb, errcb) {
+      var d  = this.__getresource("parsesource","POST","/workspace/parseSource", cb, errcb);
+      d.parsesource({}, data);
     }
   }
 });

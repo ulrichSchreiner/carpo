@@ -93,7 +93,7 @@ qx.Class.define("carpo.EditorsPane",
           editor.refreshEditor ();
           if (this.__silent) return;
           qx.event.Timer.once(function() {
-            this.fireDataEvent("fileSelected",{name:editor.getFilename(),path:editor.getFilepath(),filesystem:editor.getFilesystem()});
+            this.fireDataEvent("fileSelected",{name:editor.getFilename(),path:editor.getFilepath(),filesystem:editor.getFilesystem(), editor:editor});
             editor.focus();
           }, this, 50);
         }
@@ -135,7 +135,7 @@ qx.Class.define("carpo.EditorsPane",
               if (current) {
                 var ed = self.getEditorFor(current.filesystem, current.path);
                 if (ed) {
-                  self.fireDataEvent("fileSelected",{name:ed.getFilename(),path:ed.getFilepath(),filesystem:ed.getFilesystem()});
+                  self.fireDataEvent("fileSelected",{name:ed.getFilename(),path:ed.getFilepath(),filesystem:ed.getFilesystem(),editor:ed});
                   self.__showEditor(ed);
                 }
               }
