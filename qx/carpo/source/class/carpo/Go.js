@@ -31,7 +31,7 @@ qx.Class.define("carpo.Go",
         text:res,
         len:methname.length+1,
         paramlen: paramlen
-      }
+      };
     }
   },
   members : {
@@ -39,7 +39,7 @@ qx.Class.define("carpo.Go",
       var curpos = editor.getCursorPosition();
       var range = editor.find("import (");
       if (range) {
-        editor.replace("import (\n\t\""+ipath+"\"");
+        editor.replace("import (\n\t\""+ipath+"\"",{start:{row:0,col:0}});
       } else {
         var pos = {row:1,column:0};
         editor.getSession().insert(pos, "import (\n\t\""+ipath+"\")\n");

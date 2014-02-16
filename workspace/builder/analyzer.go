@@ -37,21 +37,28 @@ func ParseSource(src string) ([]TokenPosition, error) {
 	if err != nil {
 		return nil, err
 	}
+	return parseFileset(f, fs), nil
+}
+
+func parseFileset(f *ast.File, fs *token.FileSet) []TokenPosition {
 	var res []TokenPosition
 
 	if f.Name != nil {
-		tp := TokenPosition{PACKAGE, "", f.Name.Name, "", fs.Position(f.Pos()).Line}
+		pos := fs.Position(f.Pos())
+		tp := TokenPosition{PACKAGE, pos.Filename, f.Name.Name, "", pos.Line}
 		res = append(res, tp)
 	}
 	for _, i := range f.Imports {
 		if i.Path != nil {
-			tp := TokenPosition{IMPORT, "", i.Path.Value, "", fs.Position(i.Pos()).Line}
+			pos := fs.Position(f.Pos())
+			tp := TokenPosition{IMPORT, pos.Filename, i.Path.Value, "", pos.Line}
 			res = append(res, tp)
 		}
 	}
 	for _, d := range f.Decls {
 		switch x := d.(type) {
 		case *ast.FuncDecl:
+			pos := fs.Position(x.Pos())
 			if x.Recv != nil {
 				var recv *string
 				n := x.Recv.List[0].Type
@@ -68,10 +75,10 @@ func ParseSource(src string) ([]TokenPosition, error) {
 				} else {
 					recv = &id.Name
 				}
-				tp := TokenPosition{METH, "", x.Name.Name, *recv, fs.Position(x.Pos()).Line}
+				tp := TokenPosition{METH, pos.Filename, x.Name.Name, *recv, pos.Line}
 				res = append(res, tp)
 			} else {
-				tp := TokenPosition{FUNC, "", x.Name.Name, "", fs.Position(x.Pos()).Line}
+				tp := TokenPosition{FUNC, pos.Filename, x.Name.Name, "", pos.Line}
 				res = append(res, tp)
 			}
 
@@ -80,23 +87,26 @@ func ParseSource(src string) ([]TokenPosition, error) {
 			case token.CONST:
 				for _, s := range x.Specs {
 					vs := s.(*ast.ValueSpec)
-					tp := TokenPosition{CONST, "", vs.Names[0].Name, "", fs.Position(vs.Pos()).Line}
+					pos := fs.Position(vs.Pos())
+					tp := TokenPosition{CONST, pos.Filename, vs.Names[0].Name, "", pos.Line}
 					res = append(res, tp)
 				}
 			case token.VAR:
 				for _, s := range x.Specs {
 					vs := s.(*ast.ValueSpec)
-					tp := TokenPosition{VAR, "", vs.Names[0].Name, "", fs.Position(vs.Pos()).Line}
+					pos := fs.Position(x.Pos())
+					tp := TokenPosition{VAR, pos.Filename, vs.Names[0].Name, "", pos.Line}
 					res = append(res, tp)
 				}
 			case token.TYPE:
 				for _, s := range x.Specs {
 					vs := s.(*ast.TypeSpec)
-					tp := TokenPosition{TYPE, "", vs.Name.Name, "", fs.Position(vs.Pos()).Line}
+					pos := fs.Position(x.Pos())
+					tp := TokenPosition{TYPE, pos.Filename, vs.Name.Name, "", pos.Line}
 					res = append(res, tp)
 				}
 			}
 		}
 	}
-	return res, nil
+	return res
 }
