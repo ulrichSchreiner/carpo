@@ -226,15 +226,18 @@ qx.Class.define("carpo.Application",
           var fs = selection.getFs();
           var src = selection.getSource();
           var app =this;
-          
-          var editor = this.editors.getEditorFor(fs, src);
-          if (!editor) {
+          var editor = this.editors.getCurrentEditor();
+          if (fs !== null && fs !== "") {
+            editor = this.editors.getEditorFor(fs, src);
+            if (!editor) {
               this.workspace.loadFile (fs, src, function (data) {
                   var editor = app.editors.openEditor(fs, src, data.title, data.content, data.filemode);
                   editor.jumpTo(selection.getLine(), 0);
                   app.showAnnotations();
               });  
-          } else {
+            }
+          } 
+          if (editor) {
             this.editors.showEditor(editor);
             editor.jumpTo(selection.getLine(), 0);
           }
@@ -1165,8 +1168,12 @@ qx.Class.define("carpo.Application",
     parseSource : function (fs, path, src) {
       this.sourceModel.removeAll();
       var show = qx.lang.Function.bind(this.showParseResult, this);
-      this.workspace.parseSource ({filesystem:fs, path:path, content:src}, show, function (e) {
-      });
+      qx.event.Timer.once(function () {
+        // force the server to parse only the content and not the whole package
+        this.workspace.parseSource ({filesystem:null, path:path, content:src}, show, function (e) {
+        });
+      },this,100);  
+            
     },
     
     showParseResult : function (d) {

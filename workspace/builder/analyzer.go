@@ -64,13 +64,18 @@ func ParseSource(src string) ([]TokenPosition, error) {
 }
 
 func appendTokenPosition(fs filesystem.WorkspaceFS, ar []TokenPosition, pos token.Position, name, target string, tt TokenType) []TokenPosition {
-	pt, err := filepath.Rel(fs.Base(), pos.Filename)
-	if err == nil {
-		tp := TokenPosition{tt, "/" + pt, name, target, pos.Line, fs.Name(), filepath.Base(pos.Filename), "/" + filepath.Dir(pt)}
-		return append(ar, tp)
+	pt := pos.Filename
+	var fsname string
+	if fs != nil {
+		fsname = fs.Name()
+		if pat, err := filepath.Rel(fs.Base(), pos.Filename); err == nil {
+			pt = pat
+		} else {
+			buildLogger.Errorf("Path is not relative to Filesystem: %s", err)
+		}
 	}
-	buildLogger.Errorf("Path is not relative to Filesystem: %s", err)
-	return ar
+	tp := TokenPosition{tt, "/" + pt, name, target, pos.Line, fsname, filepath.Base(pos.Filename), "/" + filepath.Dir(pt)}
+	return append(ar, tp)
 }
 
 func parseFileset(wks filesystem.WorkspaceFS, f *ast.File, fs *token.FileSet) []TokenPosition {
