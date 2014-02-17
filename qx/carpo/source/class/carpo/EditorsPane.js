@@ -72,8 +72,7 @@ qx.Class.define("carpo.EditorsPane",
     },
 
 
-    construct : function(app, workspace, config)
-    {
+    construct : function(app, workspace, config) {
       this.base(arguments);
       this.getChildControl("bar").setScrollStep(40);
       this._openeditors = {};
@@ -86,7 +85,9 @@ qx.Class.define("carpo.EditorsPane",
       app.addListener("configChanged", this._configChanged, this);
       this.addListener ("changeSelection", function (evt) {        
         var editors = this.getSelection();
-        if (!editors || editors.length === 0) return;
+        if (!editors || editors.length === 0) {
+          return;
+        }
         var editor = evt.getData()[0];
         if (editor) {
           this.saveEditorState();

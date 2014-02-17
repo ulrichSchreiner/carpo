@@ -82,7 +82,9 @@ type (
 
 type (
 	parsesource struct {
-		Content string `json:"content"`
+		Content    string  `json:"content"`
+		Filesystem *string `json:"filesystem"`
+		Path       string  `json:"path"`
 	}
 	parsesourceResult struct {
 		Tokens []builder.TokenPosition `json:"tokens"`
@@ -214,7 +216,8 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 			} else {
 				fres.BuildOutput = *output
 			}
-			toks, err := builder.ParseSource(string(src))
+			//toks, err := builder.ParseSource(string(src))
+			toks, err := builder.ParsePath(fs, rq.Path)
 			if err == nil {
 				fres.Parsed = &parsesourceResult{Tokens: toks}
 			}
@@ -615,9 +618,19 @@ func (serv *workspace) parseSource(request *restful.Request, response *restful.R
 		sendError(response, http.StatusBadRequest, fmt.Errorf("Error reading parsesource content: %s", err))
 		return
 	}
-	res, err := builder.ParseSource(rq.Content)
+	var res []builder.TokenPosition
+	if rq.Filesystem != nil && *(rq.Filesystem) != "" {
+		fs, err := serv.fs(*rq.Filesystem)
+		if err != nil {
+			sendError(response, http.StatusBadRequest, fmt.Errorf("Error interpreting filesystem: %s", err))
+			return
+		}
+		res, err = builder.ParsePath(fs, rq.Path)
+	} else {
+		res, err = builder.ParseSource(rq.Content)
+	}
 	if err != nil {
-		sendError(response, http.StatusBadRequest, fmt.Errorf("Error parseing source content: %s", err))
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Error parsing source content: %s", err))
 		return
 	}
 	response.WriteEntity(parsesourceResult{res})

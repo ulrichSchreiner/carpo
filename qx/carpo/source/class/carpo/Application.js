@@ -141,9 +141,8 @@ qx.Class.define("carpo.Application",
           var path = e.getData().path;
           var fs = e.getData().filesystem;
           fb.selectNode({path:path,fs:fs});
-          this.parseSource (e.getData().editor.getContent());
+          this.checkPackageStructure (fs, path,e.getData().editor.getContent());
         }, this);
-
         var output = new qx.ui.tabview.TabView();
         output.setContentPadding(0,0,0,0);
         var problems = new qx.ui.tabview.Page("Problems");
@@ -224,9 +223,20 @@ qx.Class.define("carpo.Application",
         sourceLayout.getSelection().addListener("change", function(e) {
           var selection = sourceLayout.getSelection().getItem(0);
           if (!selection) return;
-          var ed = this.editors.getCurrentEditor();
-          if (ed) {
-            ed.jumpTo(selection.getLine(), 0);
+          var fs = selection.getFs();
+          var src = selection.getSource();
+          var app =this;
+          
+          var editor = this.editors.getEditorFor(fs, src);
+          if (!editor) {
+              this.workspace.loadFile (fs, src, function (data) {
+                  var editor = app.editors.openEditor(fs, src, data.title, data.content, data.filemode);
+                  editor.jumpTo(selection.getLine(), 0);
+                  app.showAnnotations();
+              });  
+          } else {
+            this.editors.showEditor(editor);
+            editor.jumpTo(selection.getLine(), 0);
           }
         }, this);
         
@@ -1137,16 +1147,32 @@ qx.Class.define("carpo.Application",
       wiz.show();
     },
     
-    parseSource : function (src) {
+    checkPackageStructure : function (fs, fpath, content) {
+      if (this.sourceModel.getLength() > 0) {
+        var first = this.sourceModel.getItem(0);
+        var pkg = first.getPkg();
+        var fpkg = fpath.split("/").slice(0, -1).join("/");
+        if (fpkg === pkg) {
+          return;
+        }
+      }
+      if (this.editors.getChildren().length > 0)
+        this.parseSource (fs, fpath, content);
+      else
+        this.sourceModel.removeAll();
+    },
+    
+    parseSource : function (fs, path, src) {
       this.sourceModel.removeAll();
       var show = qx.lang.Function.bind(this.showParseResult, this);
-      this.workspace.parseSource ({content:src}, show, function (e) {
+      this.workspace.parseSource ({filesystem:fs, path:path, content:src}, show, function (e) {
       });
     },
     
     showParseResult : function (d) {
       this.sourceModel.removeAll();
       var mod = this.sourceModel;
+      if (d.tokens === null) return;
       for (var i=0; i<d.tokens.length; i++) {
         var t = d.tokens[i];
         var n = t.name;
@@ -1157,10 +1183,13 @@ qx.Class.define("carpo.Application",
           name : t.name,
           label : n,
           line : t.line,
-          type : t.tokentype
+          type : t.tokentype,
+          fs : t.filesystem,
+          source : t.source,
+          pkg : t.gopackage
         };
         switch (t.tokentype) {
-          case "PACKAGE": e.icon = "package.gif"; e.sort=0; break;
+          case "PACKAGE": e.icon = "package.gif"; e.sort=0; e.label = e.label+" ["+t.filename+"]"; break;
           case "IMPORT": e.icon = "import.png"; e.sort=1; break;
           case "FUNC": e.icon = "function_public.gif"; e.sort=5; break;
           case "METHOD": e.icon = "function_public.gif"; e.sort=5; break;
@@ -1168,7 +1197,9 @@ qx.Class.define("carpo.Application",
           case "VAR": e.icon = "variable.gif"; e.sort=3; break;
           case "TYPE": e.icon = "struct.gif"; e.sort=4; break;
         }
-        mod.push( qx.data.marshal.Json.createModel(e));
+        // dont show the imports ...
+        if (t.tokentype !== "IMPORT")
+          mod.push( qx.data.marshal.Json.createModel(e));
       }
     },
     

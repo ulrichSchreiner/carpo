@@ -2,9 +2,11 @@ package builder
 
 import (
 	"fmt"
+	"github.com/ulrichSchreiner/carpo/workspace/filesystem"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"path/filepath"
 )
 
 /*
@@ -24,11 +26,32 @@ const (
 )
 
 type TokenPosition struct {
-	Type   TokenType `json:"tokentype"`
-	Source string    `json:"source"`
-	Name   string    `json:"name"`
-	Target string    `json:"target"`
-	Line   int       `json:"line"`
+	Type       TokenType `json:"tokentype"`
+	Source     string    `json:"source"`
+	Name       string    `json:"name"`
+	Target     string    `json:"target"`
+	Line       int       `json:"line"`
+	Filesystem string    `json:"filesystem"`
+	Filename   string    `json:"filename"`
+	Package    string    `json:"gopackage"`
+}
+
+func ParsePath(fs filesystem.WorkspaceFS, pt string) ([]TokenPosition, error) {
+	fset := token.NewFileSet()
+	fpt := fs.Abs(filepath.Dir(pt))
+	f, err := parser.ParseDir(fset, fpt, nil, 0)
+	if err != nil {
+		return nil, err
+	}
+	var res []TokenPosition
+
+	for _, p := range f {
+		for _, f := range p.Files {
+			res = append(res, parseFileset(fs, f, fset)...)
+		}
+	}
+
+	return res, nil
 }
 
 func ParseSource(src string) ([]TokenPosition, error) {
@@ -37,22 +60,28 @@ func ParseSource(src string) ([]TokenPosition, error) {
 	if err != nil {
 		return nil, err
 	}
-	return parseFileset(f, fs), nil
+	return parseFileset(nil, f, fs), nil
 }
 
-func parseFileset(f *ast.File, fs *token.FileSet) []TokenPosition {
+func appendTokenPosition(fs filesystem.WorkspaceFS, ar []TokenPosition, pos token.Position, name, target string, tt TokenType) []TokenPosition {
+	pt, err := filepath.Rel(fs.Base(), pos.Filename)
+	if err == nil {
+		tp := TokenPosition{tt, "/" + pt, name, target, pos.Line, fs.Name(), filepath.Base(pos.Filename), "/" + filepath.Dir(pt)}
+		return append(ar, tp)
+	}
+	buildLogger.Errorf("Path is not relative to Filesystem: %s", err)
+	return ar
+}
+
+func parseFileset(wks filesystem.WorkspaceFS, f *ast.File, fs *token.FileSet) []TokenPosition {
 	var res []TokenPosition
 
 	if f.Name != nil {
-		pos := fs.Position(f.Pos())
-		tp := TokenPosition{PACKAGE, pos.Filename, f.Name.Name, "", pos.Line}
-		res = append(res, tp)
+		res = appendTokenPosition(wks, res, fs.Position(f.Pos()), f.Name.Name, "", PACKAGE)
 	}
 	for _, i := range f.Imports {
 		if i.Path != nil {
-			pos := fs.Position(f.Pos())
-			tp := TokenPosition{IMPORT, pos.Filename, i.Path.Value, "", pos.Line}
-			res = append(res, tp)
+			res = appendTokenPosition(wks, res, fs.Position(f.Pos()), i.Path.Value, "", IMPORT)
 		}
 	}
 	for _, d := range f.Decls {
@@ -75,11 +104,9 @@ func parseFileset(f *ast.File, fs *token.FileSet) []TokenPosition {
 				} else {
 					recv = &id.Name
 				}
-				tp := TokenPosition{METH, pos.Filename, x.Name.Name, *recv, pos.Line}
-				res = append(res, tp)
+				res = appendTokenPosition(wks, res, pos, x.Name.Name, *recv, METH)
 			} else {
-				tp := TokenPosition{FUNC, pos.Filename, x.Name.Name, "", pos.Line}
-				res = append(res, tp)
+				res = appendTokenPosition(wks, res, pos, x.Name.Name, "", FUNC)
 			}
 
 		case *ast.GenDecl:
@@ -87,23 +114,17 @@ func parseFileset(f *ast.File, fs *token.FileSet) []TokenPosition {
 			case token.CONST:
 				for _, s := range x.Specs {
 					vs := s.(*ast.ValueSpec)
-					pos := fs.Position(vs.Pos())
-					tp := TokenPosition{CONST, pos.Filename, vs.Names[0].Name, "", pos.Line}
-					res = append(res, tp)
+					res = appendTokenPosition(wks, res, fs.Position(vs.Pos()), vs.Names[0].Name, "", CONST)
 				}
 			case token.VAR:
 				for _, s := range x.Specs {
 					vs := s.(*ast.ValueSpec)
-					pos := fs.Position(x.Pos())
-					tp := TokenPosition{VAR, pos.Filename, vs.Names[0].Name, "", pos.Line}
-					res = append(res, tp)
+					res = appendTokenPosition(wks, res, fs.Position(vs.Pos()), vs.Names[0].Name, "", VAR)
 				}
 			case token.TYPE:
 				for _, s := range x.Specs {
 					vs := s.(*ast.TypeSpec)
-					pos := fs.Position(x.Pos())
-					tp := TokenPosition{TYPE, pos.Filename, vs.Name.Name, "", pos.Line}
-					res = append(res, tp)
+					res = appendTokenPosition(wks, res, fs.Position(vs.Pos()), vs.Name.Name, "", TYPE)
 				}
 			}
 		}
