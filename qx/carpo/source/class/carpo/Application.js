@@ -25,6 +25,30 @@ qx.Class.define("carpo.Application",
     "configChanged"   : "qx.event.type.Data"
   },
 
+  statics : {
+    globToRegex : function (glob) {
+      var specialChars = "\\^$*+?.()|{}[]";
+      var regexChars = ["^"];
+      for (var i = 0; i < glob.length; ++i) {
+          var c = glob.charAt(i);
+          switch (c) {
+              case '?':
+                  regexChars.push(".");
+                  break;
+              case '*':
+                  regexChars.push(".*");
+                  break;
+              default:
+                  if (specialChars.indexOf(c) >= 0) {
+                      regexChars.push("\\");
+                  }
+                  regexChars.push(c);
+          }
+      }
+      regexChars.push("$");
+      return new RegExp(regexChars.join(""),"i");
+    }    
+  },
 
   /*
   *****************************************************************************
@@ -223,24 +247,7 @@ qx.Class.define("carpo.Application",
         sourceLayout.getSelection().addListener("change", function(e) {
           var selection = sourceLayout.getSelection().getItem(0);
           if (!selection) return;
-          var fs = selection.getFs();
-          var src = selection.getSource();
-          var app =this;
-          var editor = this.editors.getCurrentEditor();
-          if (fs !== null && fs !== "") {
-            editor = this.editors.getEditorFor(fs, src);
-            if (!editor) {
-              this.workspace.loadFile (fs, src, function (data) {
-                  var editor = app.editors.openEditor(fs, src, data.title, data.content, data.filemode);
-                  editor.jumpTo(selection.getLine(), 0);
-                  app.showAnnotations();
-              });  
-            }
-          } 
-          if (editor) {
-            this.editors.showEditor(editor);
-            editor.jumpTo(selection.getLine(), 0);
-          }
+          this.jumpToSource (selection.getFs(), selection.getSource(), selection.getLine());
         }, this);
         
         pane.add(fb, 1);
@@ -463,6 +470,8 @@ qx.Class.define("carpo.Application",
         this._addPackage.addListener("execute", this.addPackage, this);
         this._createGoProject = new qx.ui.core.Command();
         this._createGoProject.addListener("execute", this.createGoProject, this);
+        this._showPackage = new qx.ui.core.Command("Alt-Shift-P");
+        this._showPackage.addListener("execute", this.showPackageStructure, this);
     },
     getRunningToolbar : function (output) {
       var toolbar = new qx.ui.toolbar.ToolBar();
@@ -680,11 +689,13 @@ qx.Class.define("carpo.Application",
     getSourceMenu : function () {
       var menu = new qx.ui.menu.Menu ();
       
-      var addimport = new qx.ui.menu.Button ("Add import", null, this._addImport);
-      var addpackage = new qx.ui.menu.Button("Install package",null, this._addPackage);
+      var addimport = new qx.ui.menu.Button ("Add import...", null, this._addImport);
+      var addpackage = new qx.ui.menu.Button("Install package...",null, this._addPackage);
+      var showpackage = new qx.ui.menu.Button("Show package...",null, this._showPackage);
       
       menu.add (addimport);
       menu.add (addpackage);
+      menu.add (showpackage);
       
       return menu;
     },
@@ -699,7 +710,7 @@ qx.Class.define("carpo.Application",
             this.workspace.saveFile(data.filesystem, data.path, data, function (rsp) {
               if (rsp.parsed) {
                 app.sourceModel.removeAll();
-                app.showParseResult(rsp.parsed);
+                app.showParseResult(rsp.parsed, app.sourceModel);
               }
               editor.setEditorValue(rsp.formattedcontent, true);
               app.saveConfig(); // saves new breakpoints
@@ -1041,7 +1052,63 @@ qx.Class.define("carpo.Application",
         });
       });
     },
-    showFilteredPopup : function (evt, title, withdesc, loadfunc, selfunc, onfilterchange) {
+    showPackageStructure : function (evt) {
+      var ws = this.workspace;
+      var app = this;
+      this.showFilteredPopup(evt, "Package contents", false, function(data) {
+        data.removeAll();
+        data.push (qx.data.marshal.Json.createModel({label:"Please wait",icon:null}));
+        var ed = app.editors.getCurrentEditor();
+        if (ed) {
+          var show = qx.lang.Function.bind(function (d) {app.showParseResult(d, data)}, this);
+          qx.event.Timer.once(function () {
+            ws.parseSource ({filesystem:ed.getFilesystem(), path:ed.getFilepath(), content:ed.getContent()}, show, function (e) {
+            });
+          },this,100); 
+        }
+        //data.push(qx.data.marshal.Json.createModel({name:"test"}, false));
+      }, function (ed, val) {
+        app.jumpToSource (val.getFs(), val.getSource(), val.getLine());
+      }, function (filt, data, list) {
+        var re = null;
+        var filtvalue = filt.getValue();
+        if (filtvalue) {
+          if (filtvalue[filtvalue.length-1]!=="*")
+            filtvalue = filtvalue + "*";
+          re = carpo.Application.globToRegex(filtvalue);
+        }
+        var delg = {sorter:list.getDelegate().sorter};
+        delg.filter = function(data) {
+            if (re) {
+              return data.getLabel().match(re);
+            }
+            return true;
+          };
+        list.setDelegate (delg);
+      }, function (lst,data) {
+        lst.set({
+          labelPath:"label",
+          iconPath: "icon",
+          iconOptions: {converter : function(data) {
+            if (data)
+              return "carpo/"+data;
+            return null;
+          }}
+        });
+        var delegate = {
+          sorter : function(a, b) {
+            var as = a.getSort();
+            var bs = b.getSort();
+            if (as > bs) return 1;
+            if (as < bs) return -1;
+            return a.getName().localeCompare(b.getName());
+          }
+        };
+        lst.setDelegate(delegate);
+      });
+    },
+    
+    showFilteredPopup : function (evt, title, withdesc, loadfunc, selfunc, onfilterchange, initlist) {
       var bnds = this.relativeBounds(2);
       var popup = new qx.ui.popup.Popup(new qx.ui.layout.VBox(3)).set({
         backgroundColor: "#FFFAD3",
@@ -1062,11 +1129,13 @@ qx.Class.define("carpo.Application",
       filter.addListener ("input", function (e) {
         onfilterchange(filter, data, list);
       }, this);
-      
+      if (initlist)
+        initlist (list, data);
       popup.add(list,{flex:1});
       loadfunc(data);
       popup.addListener("keypress", function (e) {
         if(e.getKeyIdentifier() == "Enter") {
+          e.stop();
           var ed = this.editors.getCurrentEditor();
           if (ed) {
             selfunc(ed, list.getSelection().toArray()[0]);
@@ -1075,6 +1144,7 @@ qx.Class.define("carpo.Application",
           if (ed)
             ed.getAceEditor().focus();
         } else if (e.getKeyIdentifier() == "Escape") {
+          e.stop();
           popup.setVisibility("hidden");
           var ed = this.editors.getCurrentEditor();
           if (ed)
@@ -1164,21 +1234,39 @@ qx.Class.define("carpo.Application",
       else
         this.sourceModel.removeAll();
     },
+    jumpToSource : function (fs, src, line) {
+      var app =this;
+      var editor = this.editors.getCurrentEditor();
+      if (fs !== null && fs !== "") {
+        editor = this.editors.getEditorFor(fs, src);
+        if (!editor) {
+          this.workspace.loadFile (fs, src, function (data) {
+              var editor = app.editors.openEditor(fs, src, data.title, data.content, data.filemode);
+              editor.jumpTo(line, 0);
+              app.showAnnotations();
+          });  
+        }
+      } 
+      if (editor) {
+        this.editors.showEditor(editor);
+        editor.jumpTo(line, 0);
+      }
+    },
     
     parseSource : function (fs, path, src) {
       this.sourceModel.removeAll();
-      var show = qx.lang.Function.bind(this.showParseResult, this);
+      var show = qx.lang.Function.bind(function (d) {this.showParseResult(d, this.sourceModel)}, this);
       qx.event.Timer.once(function () {
         // force the server to parse only the content and not the whole package
         this.workspace.parseSource ({filesystem:null, path:path, content:src}, show, function (e) {
         });
       },this,100);  
-            
     },
     
-    showParseResult : function (d) {
-      this.sourceModel.removeAll();
-      var mod = this.sourceModel;
+    showParseResult : function (d, mod) {
+      //this.sourceModel.removeAll();
+      mod.removeAll();
+      //var mod = this.sourceModel;
       if (d.tokens === null) return;
       for (var i=0; i<d.tokens.length; i++) {
         var t = d.tokens[i];

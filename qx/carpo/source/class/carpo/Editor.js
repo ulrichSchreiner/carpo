@@ -81,6 +81,7 @@ qx.Class.define("carpo.Editor",
         if (row <0) return;
         if (this.__ace) {
           var pos = {row:row-1,col:col};
+          this.__ace.clearSelection();
           this.__ace.moveCursorToPosition(pos);
           this.__ace.scrollToLine(pos.row-1, true, false, function() {});
           this.__ace.focus();
