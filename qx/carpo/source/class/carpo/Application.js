@@ -328,15 +328,19 @@ qx.Class.define("carpo.Application",
       return true;      
     },
     
+    addImportPathToIgnoreList : function (config, pt) {
+      if (!config.ignoredPackages[pt]) {
+        config.ignoredPackages[pt] = {};
+      }
+    },
+    
     problemContextMenu : function (col, row, table, dataModel, contextMenu) {
       var config = this.getConfig();
       var me = new qx.ui.menu.Button ("Ignore packages when building");
       me.addListener("execute", function (e) {
         table.getSelectionModel().iterateSelection(function(ind) {
           var dat = dataModel.getValue(9, ind);
-          if (!config.ignoredPackages[dat.packageimportpath]) {
-            config.ignoredPackages[dat.packageimportpath] = {};
-          }
+          this.addImportPathToIgnoreList(config, dat);
         });
         
         this.saveConfig();

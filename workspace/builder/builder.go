@@ -21,13 +21,14 @@ import (
 type goCommand string
 
 const (
-	goCommand_build goCommand = "install"
-	goCommand_vet   goCommand = "vet"
-	goCommand_env   goCommand = "env"
-	goCommand_test  goCommand = "test"
-	workdir                   = ".carpowork"
-	abssrc                    = "/src/"
-	godoc_org                 = "http://api.godoc.org"
+	goCommand_build       goCommand = "install"
+	goCommand_vet         goCommand = "vet"
+	goCommand_env         goCommand = "env"
+	goCommand_test        goCommand = "test"
+	workdir                         = ".carpowork"
+	abssrc                          = "/src/"
+	godoc_org                       = "http://api.godoc.org"
+	goerr_cantloadpackage           = "can't load package: "
 )
 
 var (
@@ -53,6 +54,9 @@ func (ws *GoWorkspace) findDirectoryFromPackage(p string) string {
 func (ws *GoWorkspace) search(def filesystem.WorkspaceFS, cwd, pt string) (filesystem.WorkspaceFS, string, error) {
 	if strings.HasPrefix(pt, "../src") {
 		return def, pt[2:], nil
+	}
+	if strings.HasPrefix(pt, def.Base()) {
+		return def, pt[len(def.Base()):], nil
 	}
 	abspath := filepath.Clean(filepath.Join(cwd, pt))
 	for _, wfs := range ws.filesystems {
@@ -244,6 +248,9 @@ func (ws *GoWorkspace) parseBuildTypedOutput(base filesystem.WorkspaceFS, output
 		}
 		l = strings.TrimSpace(l)
 		b := []byte(l)
+		if strings.HasPrefix(l, goerr_cantloadpackage) {
+			b = []byte(l[len(goerr_cantloadpackage):])
+		}
 		m := build_line.FindSubmatch(b)
 		if m != nil {
 			var br BuildResult

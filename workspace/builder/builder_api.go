@@ -211,7 +211,15 @@ func (ws *GoWorkspace) FullBuild(base filesystem.WorkspaceFS, ignoredPackages ma
 	args := []string{}
 	dirs := []string{}
 	for p, _ := range ws.Packages {
-		if _, ok := ignoredPackages[p]; !ok {
+		ignore := false
+		for ip, _ := range ignoredPackages {
+			if strings.HasPrefix(p, ip) {
+				ignore = true
+				break
+			}
+		}
+
+		if !ignore {
 			args = append(args, p)
 			dirs = append(dirs, ws.findDirectoryFromPackage(p))
 		}

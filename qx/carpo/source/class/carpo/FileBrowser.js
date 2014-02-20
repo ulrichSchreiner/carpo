@@ -68,6 +68,8 @@ qx.Class.define("carpo.FileBrowser", {
       this._newFolderCommand.addListener("execute", this.newFolder, this);
       this._removeFileCommand = new qx.ui.core.Command ();
       this._removeFileCommand.addListener("execute", this.removeFile, this);
+      this._excludePackageCommand = new qx.ui.core.Command ();
+      this._excludePackageCommand.addListener("execute", this.excludePackage, this);
       
       this.add(this.tree, {flex:1});
     },
@@ -190,11 +192,13 @@ qx.Class.define("carpo.FileBrowser", {
         
         var newFile = new qx.ui.menu.Button("File", "icon/16/actions/document-new.png", this._newFileCommand);
         var newFolder = new qx.ui.menu.Button("Folder", "icon/16/actions/folder-new.png", this._newFolderCommand);
+
         newMenu.add(newFile);
         newMenu.add(newFolder);
         
         menu.add (new qx.ui.menu.Button("New", "icon/16/actions/document-new.png", null, newMenu));
         menu.add (new qx.ui.menu.Button("Delete", "icon/16/actions/edit-delete.png", this._removeFileCommand));
+        menu.add (new qx.ui.menu.Button("Exclude from Build", null, this._excludePackageCommand));
   
         return menu;
       },
@@ -282,6 +286,27 @@ qx.Class.define("carpo.FileBrowser", {
                 self.loadContent(pt, node, null);
               });
             });
+          }
+        }
+      },
+      
+      excludePackage : function (evt) {
+        var node = this.getSelectedTreeNode();
+        var self = this;
+        if (node) {
+          var pt = node.getPath();
+          var sub = "/src/";
+          if (pt.substring(0,sub.length) === sub) {
+            var pkg = pt.substring(sub.length);
+            if (!node.getDir()) {
+              pkg = pkg.split("/").slice(0,-1).join("/");
+            }
+            if (pkg[pkg.length-1] === "/")
+              pkg = pkg.substring(0, pkg.length-1);
+            var config = this._application.getConfig();
+            this._application.addImportPathToIgnoreList(config, pkg);
+            this._application.saveConfig();
+            this._application.refreshIgnoredResources();
           }
         }
       }
