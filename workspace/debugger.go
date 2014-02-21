@@ -222,6 +222,7 @@ func (wks *workspace) removeBreakpoint(cmd *breakpoint_cmd, gdb *gdbmi.GDB) erro
 	abspath := fs.Abs(bp.Source)
 	debuglogger.Tracef("remove breakpoint from %s:%d", abspath, bp.Line)
 	_, err := gdb.Exec_interrupt(true, nil)
+	debuglogger.Tracef("removed breakpoint from %s", err)
 	if err != nil {
 		return err
 	}
