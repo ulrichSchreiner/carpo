@@ -93,13 +93,19 @@ func (ws *workspace) debug(lc *launchConfig) (*gdbmi.GDB, error) {
 		debuglogger.Errorf("error start target: %+v", err)
 		return nil, err
 	}
-	if len(lc.parameters) > 0 {
-		gdb.Exec_arguments(lc.parameters...)
-	}
 	_, err := gdb.SetAsync()
 	if err != nil {
 		debuglogger.Errorf("cannot set async mode: %s", err)
 		return nil, err
+	}
+	_, err = gdb.SetNonstop()
+	if err != nil {
+		debuglogger.Errorf("cannot set non-stop mode: %s", err)
+		return nil, err
+	}
+
+	if len(lc.parameters) > 0 {
+		gdb.Exec_arguments(lc.parameters...)
 	}
 	breakpoints := ws.breakpoints()
 	for _, bp := range breakpoints {
@@ -153,6 +159,8 @@ func debugConsoleHandler(wks *workspace) websocket.Handler {
 								quit <- true
 							}()
 							return
+						} else if ev.StopReason == gdbmi.Async_stopped_signal_received && ev.SignalName == "0" {
+							debuglogger.Infof("signal received, ignoring ... %#v", ev)
 						} else {
 							go func() {
 								clientqueue <- eventMessage(&ev, wks.filesystems)
@@ -220,13 +228,15 @@ func (wks *workspace) removeBreakpoint(cmd *breakpoint_cmd, gdb *gdbmi.GDB) erro
 	}
 	fs := wks.filesystems[bp.Filesystem]
 	abspath := fs.Abs(bp.Source)
-	debuglogger.Tracef("remove breakpoint from %s:%d", abspath, bp.Line)
-	_, err := gdb.Exec_interrupt(true, nil)
-	debuglogger.Tracef("removed breakpoint from %s", err)
-	if err != nil {
-		return err
+
+	if gdb.Running {
+		_, err := gdb.Exec_interrupt(false, nil)
+		if err != nil {
+			return err
+		}
+		defer gdb.Exec_continue(true, false, nil)
 	}
-	defer gdb.Exec_continue(true, false, nil)
+
 	bplist, err := gdb.Break_list()
 	if err != nil {
 		return err
@@ -249,12 +259,15 @@ func (wks *workspace) addBreakpoint(cmd *breakpoint_cmd, gdb *gdbmi.GDB) error {
 	}
 	fs := wks.filesystems[bp.Filesystem]
 	abspath := fs.Abs(bp.Source)
-	debuglogger.Tracef("set breakpoint to %s:%d", abspath, bp.Line)
-	_, err := gdb.Exec_interrupt(true, nil)
-	if err != nil {
-		return err
+
+	if gdb.Running {
+		_, err := gdb.Exec_interrupt(false, nil)
+		if err != nil {
+			return err
+		}
+		defer gdb.Exec_continue(true, false, nil)
 	}
-	defer gdb.Exec_continue(true, false, nil)
+
 	bpkt, err := gdb.Breakpoint(abspath, bp.Line)
 	if err != nil {
 		return nil
