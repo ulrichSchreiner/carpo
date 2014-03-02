@@ -66,6 +66,7 @@ type GoWorkspace struct {
 	GoPath         []string
 	GoPathString   string
 	DefaultFS      filesystem.WorkspaceFS
+	Typeserver     TypeService
 
 	// some private data
 	context            build.Context
@@ -90,6 +91,7 @@ type Godoc_results struct {
 
 func NewGoWorkspace(gobin string, wspath string, gocode *string, fs map[string]filesystem.WorkspaceFS) *GoWorkspace {
 	g := new(GoWorkspace)
+	g.Typeserver = NewTypeService()
 	g.gobinpath = gobin
 	g.filesystems = fs
 	g.Packages = make(map[string]*build.Package)
@@ -109,7 +111,10 @@ func NewGoWorkspace(gobin string, wspath string, gocode *string, fs map[string]f
 	} else {
 		g.filesystems["GOROOT"] = filesystem.NewFS("GOROOT", filepath.Clean(goroot))
 		srcSystem := new(srcDir)
+		srcSystem.workspace = g
+		srcSystem.fs = g.filesystems["GOROOT"]
 		srcSystem.importer = g.importSystemPackage
+		srcSystem.relpath = filepath.Join("/", "src", "pkg")
 		srcSystem.path = filepath.Join(goroot, "src", "pkg")
 		filepath.Walk(srcSystem.path, srcSystem.walker)
 	}
@@ -117,11 +122,14 @@ func NewGoWorkspace(gobin string, wspath string, gocode *string, fs map[string]f
 	g.context.GOARCH, _ = g.env("GOARCH")
 	g.context.GOOS, _ = g.env("GOOS")
 	for i, src := range g.GoPath {
+		fs := filesystem.NewFS(filepath.Base(src), filepath.Clean(src))
 		srcd := new(srcDir)
+		srcd.fs = fs
+		srcd.workspace = g
 		srcd.importer = g.importPackage
 		srcd.path = filepath.Join(src, "src")
+		srcd.relpath = "/src"
 		filepath.Walk(srcd.path, srcd.walker)
-		fs := filesystem.NewFS(filepath.Base(src), filepath.Clean(src))
 		if i == 0 {
 			// first element in gopath is special
 			g.FirstPath = src

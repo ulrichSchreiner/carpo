@@ -129,8 +129,11 @@ func (ws *GoWorkspace) importPackage(packname string, path string) error {
 }
 
 type srcDir struct {
-	importer func(string, string) error
-	path     string
+	fs        filesystem.WorkspaceFS
+	workspace *GoWorkspace
+	importer  func(string, string) error
+	path      string
+	relpath   string
 }
 
 func (src *srcDir) walker(path string, info os.FileInfo, err error) error {
@@ -145,6 +148,7 @@ func (src *srcDir) walker(path string, info os.FileInfo, err error) error {
 			} else {
 				packname := filepath.Dir(rel)
 				src.importer(packname, path)
+				src.workspace.Typeserver.AddPackage(src.fs, filepath.Join(src.relpath, packname), packname)
 			}
 		}
 	}
