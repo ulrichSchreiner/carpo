@@ -11,6 +11,8 @@ var typeserviceLogger = loggo.GetLogger("typeservice")
 
 type TypeService interface {
 	ListPackages() []string
+	ByPackage(pkg string) []TokenPosition
+	ByPath(path string) []TokenPosition
 	Search(element string) []TokenPosition
 	AddPackage(fs filesystem.WorkspaceFS, path, pkg string)
 	RefreshPackage(fs filesystem.WorkspaceFS, path, pkg string)
@@ -27,6 +29,7 @@ type package_cmd struct {
 type service struct {
 	lock     sync.RWMutex
 	packages map[string][]TokenPosition
+	srcpath  map[string][]TokenPosition
 	commands chan interface{}
 }
 
@@ -39,6 +42,16 @@ func (s *service) ListPackages() []string {
 		res = append(res, k)
 	}
 	return res
+}
+
+func (s *service) ByPackage(pkg string) []TokenPosition {
+	t, _ := s.packages[pkg]
+	return t
+}
+
+func (s *service) ByPath(path string) []TokenPosition {
+	t, _ := s.srcpath[path]
+	return t
 }
 
 func (s *service) Search(element string) []TokenPosition {
@@ -81,17 +94,18 @@ func (s *service) addPackage(fs filesystem.WorkspaceFS, path, pkg string, refres
 	if found && !refresh {
 		return // package already parsed
 	}
-	toks, err := ParsePath(fs, path)
+	toks, err := ParseDirPath(fs, path)
 	if err != nil {
 		typeserviceLogger.Errorf("cannot parse path [%s]: %s", path, err)
 	} else {
-		typeserviceLogger.Infof("add package %s", pkg)
+		typeserviceLogger.Infof("add package %s (%s)", pkg, path)
 		if refresh {
 			current = toks
 		} else {
 			current = append(current, toks...)
 		}
 		s.packages[pkg] = current
+		s.srcpath[path] = current
 	}
 }
 
@@ -113,6 +127,7 @@ func (s *service) start() {
 func NewTypeService() TypeService {
 	s := service{}
 	s.packages = make(map[string][]TokenPosition)
+	s.srcpath = make(map[string][]TokenPosition)
 	s.commands = make(chan interface{}, 100) // allow async send's
 	go s.start()
 	return &s

@@ -59,6 +59,7 @@ func (w *workspace) register(container *restful.Container) {
 	ws.Route(ws.POST("/build").To(w.buildWorkspace).Reads(buildRequest{}).Writes(buildResponse{}))
 	ws.Route(ws.POST("/autocomplete").To(w.autocomplete).Reads(autocomplete{}).Writes(autocompleteResult{}))
 	ws.Route(ws.POST("/parseSource").To(w.parseSource).Reads(parsesource{}).Writes(parsesourceResult{}))
+	ws.Route(ws.POST("/opentype").To(w.openType).Reads(openType{}).Writes(openTypeResult{}))
 	ws.Route(ws.GET("/querypackages").To(w.querypackages).Writes(query_packages{}))
 	ws.Route(ws.GET("/queryremotepackages").To(w.queryremotepackages).Writes(query_packages{}))
 	ws.Route(ws.GET("/process/{pid}/kill").To(w.killproc))
@@ -66,6 +67,16 @@ func (w *workspace) register(container *restful.Container) {
 	ws.Route(ws.POST("/wizard/template").To(w.template).Reads(servertemplate{}).Writes(servertemplate_result{}))
 	container.Add(&ws)
 }
+
+type (
+	openType struct {
+		Filter string `json:"filter"`
+	}
+	openTypeResult struct {
+		Filter string                  `json:"filter"`
+		Tokens []builder.TokenPosition `json:"tokens"`
+	}
+)
 
 type (
 	autocomplete struct {
@@ -217,7 +228,7 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 				fres.BuildOutput = *output
 			}
 			//toks, err := builder.ParseSource(string(src))
-			toks, err := builder.ParsePath(fs, rq.Path)
+			toks, err := builder.ParseFilePath(fs, rq.Path)
 			if err == nil {
 				fres.Parsed = &parsesourceResult{Tokens: toks}
 			}
@@ -620,12 +631,8 @@ func (serv *workspace) parseSource(request *restful.Request, response *restful.R
 	}
 	var res []builder.TokenPosition
 	if rq.Filesystem != nil && *(rq.Filesystem) != "" {
-		fs, err := serv.fs(*rq.Filesystem)
-		if err != nil {
-			sendError(response, http.StatusBadRequest, fmt.Errorf("Error interpreting filesystem: %s", err))
-			return
-		}
-		res, err = builder.ParsePath(fs, rq.Path)
+		pt := filepath.Dir(rq.Path)
+		res = serv.goworkspace.Typeserver.ByPath(pt)
 	} else {
 		res, err = builder.ParseSource(rq.Content)
 	}
@@ -634,6 +641,17 @@ func (serv *workspace) parseSource(request *restful.Request, response *restful.R
 		return
 	}
 	response.WriteEntity(parsesourceResult{res})
+}
+
+func (serv *workspace) openType(request *restful.Request, response *restful.Response) {
+	rq := new(openType)
+	err := request.ReadEntity(&rq)
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Error reading parsesource content: %s", err))
+		return
+	}
+	res := serv.goworkspace.Typeserver.Search(rq.Filter)
+	response.WriteEntity(openTypeResult{rq.Filter, res})
 }
 
 func (serv *workspace) autocomplete(request *restful.Request, response *restful.Response) {

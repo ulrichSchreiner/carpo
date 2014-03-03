@@ -178,8 +178,10 @@ func (ws *GoWorkspace) BuildPackage(base filesystem.WorkspaceFS, packdir string)
 		// let's ignore this error, it will raise again when building...
 		//return nil, nil, fmt.Errorf("importPackage: %s", err)
 	}
+	srcdir := ws.findDirectoryFromPackage(pack)
+	ws.Typeserver.RefreshPackage(base, "/"+srcdir, pack)
 	args = append(args, pack)
-	dirs = append(dirs, ws.findDirectoryFromPackage(pack))
+	dirs = append(dirs, srcdir)
 	deps, ok := ws.neededBy[pack]
 	if ok {
 		args = append(args, deps...)
