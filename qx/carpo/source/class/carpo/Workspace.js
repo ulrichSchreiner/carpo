@@ -122,6 +122,11 @@ qx.Class.define("carpo.Workspace",
     parseSource : function (data, cb, errcb) {
       var d  = this.__getresource("parsesource","POST","/workspace/parseSource", cb, errcb);
       d.parsesource({}, data);
+    },
+    openType : function (data, cb, errcb) {
+      var d  = this.__getresource("openType","POST","/workspace/opentype", cb, errcb);
+      d.openType({}, data);
     }
+    
   }
 });

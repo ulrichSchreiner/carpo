@@ -36,10 +36,9 @@ type TokenPosition struct {
 	Package    string    `json:"gopackage"`
 }
 
-func ParsePath(fs filesystem.WorkspaceFS, pt string) ([]TokenPosition, error) {
+func ParseDirPath(fs filesystem.WorkspaceFS, pt string) ([]TokenPosition, error) {
 	fset := token.NewFileSet()
-	fpt := fs.Abs(filepath.Dir(pt))
-	f, err := parser.ParseDir(fset, fpt, nil, 0)
+	f, err := parser.ParseDir(fset, fs.Abs(pt), nil, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -54,9 +53,14 @@ func ParsePath(fs filesystem.WorkspaceFS, pt string) ([]TokenPosition, error) {
 	return res, nil
 }
 
+func ParseFilePath(fs filesystem.WorkspaceFS, pt string) ([]TokenPosition, error) {
+	fpt := filepath.Dir(pt)
+	return ParseDirPath(fs, fpt)
+}
+
 func ParseSource(src string) ([]TokenPosition, error) {
 	fs := token.NewFileSet() // positions are relative to fset
-	f, err := parser.ParseFile(fs, "src.go", src, 0)
+	f, err := parser.ParseFile(fs, "", src, 0)
 	if err != nil {
 		return nil, err
 	}

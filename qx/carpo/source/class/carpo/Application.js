@@ -476,6 +476,8 @@ qx.Class.define("carpo.Application",
         this._createGoProject.addListener("execute", this.createGoProject, this);
         this._showPackage = new qx.ui.core.Command("Alt-Shift-P");
         this._showPackage.addListener("execute", this.showPackageStructure, this);
+        this._gotoType = new qx.ui.core.Command("Alt-Shift-T");
+        this._gotoType.addListener("execute", this.openType, this);
     },
     getRunningToolbar : function (output) {
       var toolbar = new qx.ui.toolbar.ToolBar();
@@ -696,10 +698,12 @@ qx.Class.define("carpo.Application",
       var addimport = new qx.ui.menu.Button ("Add import...", null, this._addImport);
       var addpackage = new qx.ui.menu.Button("Install package...",null, this._addPackage);
       var showpackage = new qx.ui.menu.Button("Show package...",null, this._showPackage);
+      var gototype = new qx.ui.menu.Button("Open Type ...", null, this._gotoType);
       
       menu.add (addimport);
       menu.add (addpackage);
       menu.add (showpackage);
+      menu.add (gototype);
       
       return menu;
     },
@@ -1056,17 +1060,69 @@ qx.Class.define("carpo.Application",
         });
       });
     },
-    showPackageStructure : function (evt) {
+    openType : function (evt) {
       var ws = this.workspace;
       var app = this;
-      this.showFilteredPopup(evt, "Package contents", false, function(data) {
+      this.showFilteredPopup(evt, "Open ...", true, function(data) {
+      }, function (ed, val) {
+        app.jumpToSource (val.getFs(), val.getSource(), val.getLine());
+      }, function (filt, data, list) {
+        data.removeAll();
+        var filtvalue = filt.getValue();
+        var re = null;
+        //var show = qx.lang.Function.bind(function (d) {app.showParseResult(d, data)}, this);
+        if (filtvalue && filtvalue.length>2) {
+          ws.openType ({filter:filtvalue}, function (res) {
+            if (res && res.filter && res.filter !== filt.getValue())
+              return;
+            if (res && res.tokens) {
+              app.showParseResult(res, data);
+              //res.packages.sort(function (a,b) {return (a.name<b.name)?-1:1});
+              //res.packages.forEach(function (r) {
+              //  data.push(qx.data.marshal.Json.createModel(r,false));
+              //});
+            }
+          });
+        }
+      },
+      function (lst,data) {
+        lst.set({
+          labelPath:"label",
+          iconPath: "icon",
+          iconOptions: {converter : function(data) {
+            if (data)
+              return "carpo/"+data;
+            return null;
+          }}
+        });
+        var delegate = {
+          sorter : function(a, b) {
+            var as = a.getSort();
+            var bs = b.getSort();
+            if (as > bs) return 1;
+            if (as < bs) return -1;
+            return a.getName().localeCompare(b.getName());
+          }
+        };
+        lst.setDelegate(delegate);
+      });
+    },
+    showPackageStructure : function (evt) {
+      var ws = this.workspace;
+      var fetch = qx.lang.Function.bind(ws.parseSource, ws);
+      this.showPackageStructureImpl(evt, "Package contents", fetch);
+    },
+    showPackageStructureImpl : function (evt, title, fetchfunc) {
+      var ws = this.workspace;
+      var app = this;
+      this.showFilteredPopup(evt, title, false, function(data) {
         data.removeAll();
         data.push (qx.data.marshal.Json.createModel({label:"Please wait",icon:null}));
         var ed = app.editors.getCurrentEditor();
         if (ed) {
           var show = qx.lang.Function.bind(function (d) {app.showParseResult(d, data)}, this);
           qx.event.Timer.once(function () {
-            ws.parseSource ({filesystem:ed.getFilesystem(), path:ed.getFilepath(), content:ed.getContent()}, show, function (e) {
+            fetchfunc ({filesystem:ed.getFilesystem(), path:ed.getFilepath(), content:ed.getContent()}, show, function (e) {
             });
           },this,100); 
         }
@@ -1170,7 +1226,7 @@ qx.Class.define("carpo.Application",
         desc.setRich(true);
         popup.add(desc);
         list.getSelection().addListener("change", function (e) {
-          if (e.getData().added)
+          if (e.getData().added && e.getData().added.length>0)
             desc.setLabel(e.getData().added[0].getDescription());
         },this);
       }
@@ -1285,10 +1341,14 @@ qx.Class.define("carpo.Application",
           type : t.tokentype,
           fs : t.filesystem,
           source : t.source,
-          pkg : t.gopackage
+          pkg : t.gopackage,
+          description : t.name+" : "+t.source
         };
         switch (t.tokentype) {
-          case "PACKAGE": e.icon = "package.gif"; e.sort=0; e.label = e.label+" ["+t.filename+"]"; break;
+          case "PACKAGE": e.icon = "package.gif"; e.sort=0; 
+            if (t.filename != ".")
+              e.label = e.label+" ["+t.filename+"]"; 
+            break;
           case "IMPORT": e.icon = "import.png"; e.sort=1; break;
           case "FUNC": e.icon = "function_public.gif"; e.sort=5; break;
           case "METHOD": e.icon = "function_public.gif"; e.sort=5; break;

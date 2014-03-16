@@ -187,7 +187,7 @@ func (ws *GoWorkspace) gocmd(gobin string, command string, dir string, args ...s
 	arguments = append(arguments, args...)
 	cmd := exec.Command(gobin, arguments...)
 	cmd.Dir = dir
-	cmd.Env = []string{fmt.Sprintf("GOPATH=%s", ws.context.GOPATH)}
+	cmd.Env = []string{fmt.Sprintf("GOPATH=%s", ws.context.GOPATH), fmt.Sprintf("PATH=%s", os.ExpandEnv("$PATH"))}
 	res, err := cmd.CombinedOutput()
 	if err != nil {
 		// check if the command resulted with an error-exit code
