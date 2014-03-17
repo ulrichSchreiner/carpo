@@ -89,6 +89,16 @@ type Godoc_results struct {
 	Results []Godoc_result_entity `json:"results"`
 }
 
+func append_workspace_if_not_present(ws string, gp string) string {
+	gplist := filepath.SplitList(gp)
+	for _, gp := range gplist {
+		if gp == ws {
+			return gp
+		}
+	}
+	return fmt.Sprintf("%s%s%s", ws, string(filepath.ListSeparator), gp)
+}
+
 func NewGoWorkspace(gobin string, wspath string, gocode *string, fs map[string]filesystem.WorkspaceFS) *GoWorkspace {
 	g := new(GoWorkspace)
 	g.Typeserver = NewTypeService()
@@ -101,7 +111,7 @@ func NewGoWorkspace(gobin string, wspath string, gocode *string, fs map[string]f
 	g.testneededBy = make(map[string][]string)
 	g.testdependencies = make(map[string][]string)
 	g.context = build.Default
-	gopath := fmt.Sprintf("%s%s%s", wspath, string(filepath.ListSeparator), g.context.GOPATH)
+	gopath := append_workspace_if_not_present(wspath, g.context.GOPATH)
 	g.context.GOPATH = gopath
 	g.GoPathString = gopath
 	g.GoPath = filepath.SplitList(gopath)
