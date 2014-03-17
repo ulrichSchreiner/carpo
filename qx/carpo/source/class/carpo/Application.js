@@ -1012,7 +1012,10 @@ qx.Class.define("carpo.Application",
       this.showFilteredPopup(evt, "Search Remote Package", true, function(data) {
       }, function (ed, val) {
         ws.installPackage(val.getName(), function () {
-          new carpo.Go(ed.getAceEditor().getValue()).addImport(ed.getAceEditor(), val.getName());
+          if (ed) {
+            new carpo.Go(ed.getAceEditor().getValue()).addImport(ed.getAceEditor(), val.getName());
+            ed.getAceEditor().focus();
+          }
         });
       }, function (filt, data, list) {
         data.removeAll();
@@ -1043,7 +1046,10 @@ qx.Class.define("carpo.Application",
           });
         });
       }, function (ed, val) {
-        new carpo.Go(ed.getAceEditor().getValue()).addImport(ed.getAceEditor(), val.getName());
+        if (ed) {
+          new carpo.Go(ed.getAceEditor().getValue()).addImport(ed.getAceEditor(), val.getName());
+          ed.getAceEditor().focus();
+        }
       }, function (filt, data, list) {
         var re = null;
         var filtvalue = filt.getValue();
@@ -1213,13 +1219,13 @@ qx.Class.define("carpo.Application",
       }, this);
       list.addListener("dblclick", function (e) {
           var ed = this.editors.getCurrentEditor();
-          if (ed) {
+          //if (ed) {
             selfunc(ed, list.getSelection().toArray()[0]);
-          }
+          //}
           popup.setVisibility("hidden");
-          var ed = this.editors.getCurrentEditor();
-          if (ed)
-            ed.getAceEditor().focus();
+          //var ed = this.editors.getCurrentEditor();
+          //if (ed)
+          //  ed.getAceEditor().focus();
       }, this);
       if (withdesc) {
         var desc = new qx.ui.basic.Atom("<i>... Description ...</i>");
