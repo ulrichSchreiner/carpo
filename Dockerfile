@@ -19,7 +19,7 @@ ENV LC_ALL C.UTF-8
 RUN mkdir /download
 RUN cd /download && wget https://godeb.s3.amazonaws.com/godeb-amd64.tar.gz
 RUN cd /download && tar xzf godeb-amd64.tar.gz
-RUN cd /download && ./godeb install
+RUN cd /download && ./godeb install 1.2.1
 
 RUN useradd -d /carpo carpo
 RUN mkdir /workspace
@@ -45,6 +45,7 @@ ENV GOPATH /workspace/.carpoplugins
 RUN go get -u github.com/nsf/gocode
 
 ENV GOPATH /workspace
+VOLUME ["/workspace"]
 EXPOSE 8080
 ENTRYPOINT ["/work/src/github.com/ulrichSchreiner/carpo/cmd/dist/carpo"]
 CMD ["-port=8080"]
