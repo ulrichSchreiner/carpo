@@ -32,6 +32,7 @@ ENV GOPATH /work
 RUN go get code.google.com/p/go.net/websocket && \ 
   go get github.com/emicklei/go-restful && \
   go get github.com/ulrichSchreiner/gdbmi && \
+  go get github.com/jayschwa/go-pty && \
   go get launchpad.net/loggo
 
 RUN cd src/github.com/ulrichSchreiner && git clone https://github.com/ulrichSchreiner/carpo.git
