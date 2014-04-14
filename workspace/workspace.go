@@ -203,9 +203,13 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 		return
 	}
 	defer fl.Close()
-	src, err := format.Source([]byte(rq.Content))
-	if err != nil {
-		src = []byte(rq.Content)
+	isgo := strings.HasSuffix(strings.ToLower(rpath), ".go")
+	src := []byte(rq.Content)
+	if isgo {
+		src2, err := format.Source([]byte(rq.Content))
+		if err == nil {
+			src = src2
+		}
 	}
 	_, err = fl.Write(src)
 	if err != nil {
@@ -217,7 +221,7 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 	//golang.Parse(string(src), fn)
 	fres := fileSaveResponse{buildResponse{true, "File saved", "", []builder.BuildResult{}}, string(src), nil}
 	if rq.Build {
-		if strings.HasSuffix(strings.ToLower(rpath), ".go") {
+		if isgo {
 			fres.BuildType = BUILD_GOLANG
 			output, _, err := serv.goworkspace.BuildPackage(fs, fp)
 			if err != nil {
