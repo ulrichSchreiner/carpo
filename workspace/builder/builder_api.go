@@ -91,8 +91,8 @@ type Godoc_results struct {
 
 func append_workspace_if_not_present(ws string, gp string) string {
 	gplist := filepath.SplitList(gp)
-	for _, gp := range gplist {
-		if gp == ws {
+	for _, gpe := range gplist {
+		if gpe == ws {
 			return gp
 		}
 	}
@@ -111,6 +111,7 @@ func NewGoWorkspace(gobin string, wspath string, gocode *string, fs map[string]f
 	g.testneededBy = make(map[string][]string)
 	g.testdependencies = make(map[string][]string)
 	g.context = build.Default
+	buildLogger.Infof("GOPATH from environment: %s", g.context.GOPATH)
 	gopath := append_workspace_if_not_present(wspath, g.context.GOPATH)
 	g.context.GOPATH = gopath
 	g.GoPathString = gopath
