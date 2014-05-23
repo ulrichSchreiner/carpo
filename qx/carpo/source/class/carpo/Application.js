@@ -271,7 +271,7 @@ qx.Class.define("carpo.Application",
           var name = config.name;
           if (name[name.length-1]==="/") 
             name = name.substring(0, name.length-1);
-          document.title = "Carpo ["+name.split("/").splice(-1)+"]";
+          document.title = "["+name.split("/").splice(-1)+"]";
 
           app.updateEnvironment (function (env) {
             if (env.gocode && env.gocode.path)
