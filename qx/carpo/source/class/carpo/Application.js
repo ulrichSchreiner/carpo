@@ -338,9 +338,10 @@ qx.Class.define("carpo.Application",
       var config = this.getConfig();
       var me = new qx.ui.menu.Button ("Ignore packages when building");
       me.addListener("execute", function (e) {
+        var self = this;
         table.getSelectionModel().iterateSelection(function(ind) {
           var dat = dataModel.getValue(9, ind);
-          this.addImportPathToIgnoreList(config, dat);
+          self.addImportPathToIgnoreList(config, dat.packageimportpath);
         });
         
         this.saveConfig();

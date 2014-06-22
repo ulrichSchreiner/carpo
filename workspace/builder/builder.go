@@ -188,6 +188,7 @@ func (ws *GoWorkspace) gocmd(gobin string, command string, dir string, args ...s
 	cmd := exec.Command(gobin, arguments...)
 	cmd.Dir = dir
 	cmd.Env = []string{fmt.Sprintf("GOPATH=%s", ws.context.GOPATH), fmt.Sprintf("PATH=%s", os.ExpandEnv("$PATH"))}
+	buildLogger.Debugf("execute %#v", cmd)
 	res, err := cmd.CombinedOutput()
 	if err != nil {
 		// check if the command resulted with an error-exit code
@@ -209,9 +210,9 @@ func (ws *GoWorkspace) env(key string) (root string, err error) {
 
 func (ws *GoWorkspace) build(args ...string) (res string, err error) {
 	//-gcflags "-N -l"
-	buildargs := []string{"-gcflags", "-N -l"}
+	//buildargs := []string{"-race"}
 
-	args = append(buildargs, args...)
+	//args = append(buildargs, args...)
 	res, err = ws.gocmd(ws.gobinpath, string(goCommand_build), ws.Workdir, args...)
 	if err == nil {
 		//res = res + "\n" + ws.buildtests(gobin, args...)

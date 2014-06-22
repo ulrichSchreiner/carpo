@@ -114,6 +114,7 @@ func NewGoWorkspace(gobin string, wspath string, gocode *string, fs map[string]f
 	buildLogger.Infof("GOPATH from environment: %s", g.context.GOPATH)
 	gopath := append_workspace_if_not_present(wspath, g.context.GOPATH)
 	g.context.GOPATH = gopath
+	buildLogger.Infof("new GOPATH : %s", g.context.GOPATH)
 	g.GoPathString = gopath
 	g.GoPath = filepath.SplitList(gopath)
 	goroot, err := g.env("GOROOT")
