@@ -177,6 +177,20 @@ type WorkspaceConfiguration struct {
 	BaseDirectory string `json:"basedirectory"`
 }
 
+func isDir(base string, fi os.FileInfo) (bool, error) {
+	if fi.IsDir() {
+		return true, nil
+	}
+	if fi.Mode()&os.ModeSymlink != 0 {
+		pt, e := os.Stat(filepath.Join(base, fi.Name()))
+		if e != nil {
+			return false, e
+		}
+		return pt.IsDir(), nil
+	}
+	return fi.IsDir(), nil
+}
+
 func (serv *workspace) fs(name string) (filesystem.WorkspaceFS, error) {
 	fs, ok := serv.filesystems[name]
 	if !ok {
@@ -324,7 +338,15 @@ func (serv *workspace) dircontent(fs filesystem.WorkspaceFS, fl filesystem.Works
 		sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot read contents of '%s': %s", path, err))
 	} else {
 		for _, fli := range flz {
-			result.Entries = append(result.Entries, dirEntry{fs.Name(), fli.Name(), fli.IsDir()})
+			abs, _, _, e := filesystem.AbsolutePath(fs, path)
+			if e != nil {
+				sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot read contents of '%s': %s", path, err))
+			}
+			isd, e := isDir(abs, fli)
+			if e != nil {
+				sendError(response, http.StatusBadRequest, fmt.Errorf("Cannot read dir status of '%s/%#v': %s", abs, fli, err))
+			}
+			result.Entries = append(result.Entries, dirEntry{fs.Name(), fli.Name(), isd})
 		}
 		response.WriteEntity(&result)
 	}

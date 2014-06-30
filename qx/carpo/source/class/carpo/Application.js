@@ -47,7 +47,14 @@ qx.Class.define("carpo.Application",
       }
       regexChars.push("$");
       return new RegExp(regexChars.join(""),"i");
-    }    
+    },
+    isGoCode : function (pt) {
+      var suffix = ".go";
+      if (pt) {
+        var lpt = pt.toLowerCase();
+        return lpt.indexOf(suffix, lpt.length - suffix.length) !== -1;
+      }
+    }
   },
 
   /*
@@ -1322,6 +1329,7 @@ qx.Class.define("carpo.Application",
     
     parseSource : function (fs, path, src) {
       this.sourceModel.removeAll();
+      if (!carpo.Application.isGoCode(path)) return;
       var show = qx.lang.Function.bind(function (d) {this.showParseResult(d, this.sourceModel)}, this);
       qx.event.Timer.once(function () {
         // force the server to parse only the content and not the whole package
