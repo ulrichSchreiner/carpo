@@ -1332,8 +1332,7 @@ qx.Class.define("carpo.Application",
       if (!carpo.Application.isGoCode(path)) return;
       var show = qx.lang.Function.bind(function (d) {this.showParseResult(d, this.sourceModel)}, this);
       qx.event.Timer.once(function () {
-        // force the server to parse only the content and not the whole package
-        this.workspace.parseSource ({filesystem:null, path:path, content:src}, show, function (e) {
+        this.workspace.parseSource ({filesystem:fs, path:path, content:src}, show, function (e) {
         });
       },this,100);  
     },
