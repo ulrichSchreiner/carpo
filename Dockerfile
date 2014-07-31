@@ -1,6 +1,6 @@
-FROM ubuntu:13.04
+FROM ubuntu
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get install -y \
   git \
   mercurial \
   bzr \
