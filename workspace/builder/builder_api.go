@@ -298,6 +298,22 @@ func (ws *GoWorkspace) InstallGocode(plugindir string) (gocodebinpath *string, e
 	return
 }
 
+func (ws *GoWorkspace) InstallGoimports(plugindir string) (*string, error) {
+	cmd := exec.Command(ws.gobinpath, "get", "-u", "golang.org/x/tools/cmd/goimports")
+	cmd.Dir = plugindir
+	cmd.Env = []string{
+		fmt.Sprintf("GOPATH=%s", plugindir),
+		os.ExpandEnv("PATH=$PATH"), // git must be installed!
+	}
+	buildLogger.Infof("install goimports: %+v", cmd)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		binpath := filepath.Join(plugindir, "bin", "goimports")
+		return &binpath, nil
+	}
+	return nil, fmt.Errorf("Error installing 'goimports': %s (%v)", string(out), err)
+}
+
 func (ws *GoWorkspace) QueryPackages() (res Godoc_results) {
 	for _, p := range ws.SystemPackages {
 		res.Results = append(res.Results, Godoc_result_entity{Path: p.ImportPath, Synopsis: ""})

@@ -220,7 +220,8 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 	isgo := strings.HasSuffix(strings.ToLower(rpath), ".go")
 	src := []byte(rq.Content)
 	if isgo {
-		src2, err := format.Source([]byte(rq.Content))
+		//src2, err := format.Source([]byte(rq.Content))
+		src2, err := serv.formatSource([]byte(rq.Content))
 		if err == nil {
 			src = src2
 		}
@@ -713,6 +714,17 @@ func (serv *workspace) autocomplete(request *restful.Request, response *restful.
 	response.WriteEntity(rsp)
 }
 
+func (serv *workspace) formatSource(src []byte) ([]byte, error) {
+	if serv.goimports != nil {
+		cmd := exec.Command(*serv.goimports)
+		buf := bytes.NewBuffer(src)
+		cmd.Stdin = buf
+		return cmd.Output()
+	} else {
+		return format.Source(src)
+	}
+}
+
 func findPosition(content string, row int, col int) (abslen int) {
 	buf := bytes.NewBufferString(content)
 	for i := 0; i < row; i++ {
@@ -736,6 +748,7 @@ type workspace struct {
 	gotool      *string
 	goapptool   *string
 	gocode      *string
+	goimports   *string
 	goworkspace *builder.GoWorkspace
 	config      map[string]interface{}
 
@@ -783,10 +796,24 @@ func NewWorkspace(path string, version string) error {
 		os.Mkdir(filepath.Join(plugindir, "bin"), 0755)
 	}
 
-	w := workspace{version, path, plugindir, nil, nil, nil, nil, nil, nil, nil, new(sync.Mutex), make(map[string]filesystem.WorkspaceFS)}
+	w := workspace{
+		Version:      version,
+		Path:         path,
+		plugindir:    plugindir,
+		gotool:       nil,
+		goapptool:    nil,
+		gocode:       nil,
+		goimports:    nil,
+		goworkspace:  nil,
+		config:       nil,
+		processes:    make(map[int]*os.Process),
+		debugSession: make(map[int]*gdbmi.GDB),
+		proclock:     new(sync.Mutex),
+		filesystems:  make(map[string]filesystem.WorkspaceFS),
+	}
 	w.loadConfiguration()
-	w.processes = make(map[int]*os.Process)
-	w.debugSession = make(map[int]*gdbmi.GDB)
+	//w.processes = make(map[int]*os.Process)
+	//w.debugSession = make(map[int]*gdbmi.GDB)
 
 	gopath, err := exec.LookPath("go")
 	if err != nil {
@@ -812,16 +839,36 @@ func NewWorkspace(path string, version string) error {
 			return errors.New("Workspace uses nothing as go, no 'goapp' or 'go' als failover found")
 		}
 	}
+
+	gws := builder.NewGoWorkspace(*gobinpath, path, w.gocode, w.filesystems)
+	w.goworkspace = gws
 	gocode, err := findInPluginsOrEnvironment(plugindir, "gocode")
 	if err != nil {
 		workspaceLogger.Infof("no gocode found in path: %s", err)
+		goco, err := gws.InstallGocode(plugindir)
+		if err == nil {
+			w.gocode = goco
+		} else {
+			workspaceLogger.Infof("gocode cannot be installed: %s", err)
+		}
 	} else {
 		w.gocode = gocode
 		workspaceLogger.Infof("gocode: %s", *w.gocode)
 	}
 
-	gws := builder.NewGoWorkspace(*gobinpath, path, w.gocode, w.filesystems)
-	w.goworkspace = gws
+	goimports, err := findInPluginsOrEnvironment(plugindir, "goimports")
+	if err != nil {
+		workspaceLogger.Infof("no goimports found in path: %s", err)
+		gimp, err := gws.InstallGoimports(plugindir)
+		if err == nil {
+			w.goimports = gimp
+		} else {
+			workspaceLogger.Infof("goimports cannot be installed: %s", err)
+		}
+	} else {
+		w.goimports = goimports
+		workspaceLogger.Infof("goimports: %s", *w.gocode)
+	}
 
 	wsContainer := restful.NewContainer()
 	w.register(wsContainer)
