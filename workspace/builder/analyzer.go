@@ -2,11 +2,12 @@ package builder
 
 import (
 	"fmt"
-	"github.com/ulrichSchreiner/carpo/workspace/filesystem"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"path/filepath"
+
+	"github.com/ulrichSchreiner/carpo/workspace/filesystem"
 )
 
 /*
@@ -31,6 +32,8 @@ type TokenPosition struct {
 	Name       string    `json:"name"`
 	Target     string    `json:"target"`
 	Line       int       `json:"line"`
+	Offset     int       `json:"offset"`
+	Column     int       `json:"column"`
 	Filesystem string    `json:"filesystem"`
 	Filename   string    `json:"filename"`
 	Package    string    `json:"gopackage"`
@@ -78,7 +81,16 @@ func appendTokenPosition(fs filesystem.WorkspaceFS, ar []TokenPosition, pos toke
 			buildLogger.Errorf("Path is not relative to Filesystem: %s", err)
 		}
 	}
-	tp := TokenPosition{tt, "/" + pt, name, target, pos.Line, fsname, filepath.Base(pos.Filename), "/" + filepath.Dir(pt)}
+	tp := TokenPosition{Type: tt,
+		Source:     "/" + pt,
+		Name:       name,
+		Target:     target,
+		Line:       pos.Line,
+		Offset:     pos.Offset,
+		Column:     pos.Column,
+		Filesystem: fsname,
+		Filename:   filepath.Base(pos.Filename),
+		Package:    "/" + filepath.Dir(pt)}
 	return append(ar, tp)
 }
 

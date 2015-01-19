@@ -86,7 +86,7 @@ qx.Class.define("carpo.Application",
         }
         this.workspace = new carpo.Workspace(this);
         this.debugger = new carpo.Debugger(this);
-        var initfunc = qx.lang.Function.bind(this.init, this)
+        var initfunc = qx.lang.Function.bind(this.init, this);
         this.workspace.resetWorkspace(function () {
           carpo.EditorsPane.loadAce(initfunc);
         });
@@ -183,7 +183,7 @@ qx.Class.define("carpo.Application",
         this.problems = problems;
         
         var runoutput = new qx.ui.tabview.Page("Run/Debug Console");
-        var console = new qx.ui.container.Composite(new qx.ui.layout.VBox(0));
+        var rconsole = new qx.ui.container.Composite(new qx.ui.layout.VBox(0));
         var outputpanel = new qx.ui.splitpane.Pane("horizontal").set({
             allowGrowY: true,
             allowGrowX: true
@@ -197,10 +197,10 @@ qx.Class.define("carpo.Application",
           if (el)
             el.scrollTop = el.scrollHeight;
         }, this);
-        outputpanel.add(console,2);
+        outputpanel.add(rconsole,2);
         this.debugpanel = new carpo.DebugPanel(this.debugger, this, this.workspace);
-        console.add (this.getRunningToolbar(this.txtRunoutput),{flex:0});
-        console.add (this.txtRunoutput,{flex:1});
+        rconsole.add (this.getRunningToolbar(this.txtRunoutput),{flex:0});
+        rconsole.add (this.txtRunoutput,{flex:1});
         
         outputpanel.add (this.debugpanel,1);
         runoutput.add (outputpanel, {flex:1});
@@ -254,6 +254,7 @@ qx.Class.define("carpo.Application",
         sourceLayout.getSelection().addListener("change", function(e) {
           var selection = sourceLayout.getSelection().getItem(0);
           if (!selection) return;
+          console.log("selection:",selection);
           this.jumpToSource (selection.getFs(), selection.getSource(), selection.getLine());
         }, this);
         
@@ -1356,6 +1357,8 @@ qx.Class.define("carpo.Application",
           fs : t.filesystem,
           source : t.source,
           pkg : t.gopackage,
+          offset: t.offset,
+          column: t.column,
           description : t.name+" : "+t.source
         };
         switch (t.tokentype) {

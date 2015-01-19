@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/ulrichSchreiner/carpo/workspace/filesystem"
 	"go/build"
 	"io/ioutil"
-	"launchpad.net/loggo"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/ulrichSchreiner/carpo/workspace/filesystem"
+	"launchpad.net/loggo"
 )
 
 type BuildResultType string
@@ -298,20 +299,28 @@ func (ws *GoWorkspace) InstallGocode(plugindir string) (gocodebinpath *string, e
 	return
 }
 
-func (ws *GoWorkspace) InstallGoimports(plugindir string) (*string, error) {
-	cmd := exec.Command(ws.gobinpath, "get", "-u", "golang.org/x/tools/cmd/goimports")
+func (ws *GoWorkspace) InstallGoTool(plugindir string, toolname string) (*string, error) {
+	cmd := exec.Command(ws.gobinpath, "get", "-u", fmt.Sprintf("golang.org/x/tools/cmd/%s", toolname))
 	cmd.Dir = plugindir
 	cmd.Env = []string{
 		fmt.Sprintf("GOPATH=%s", plugindir),
 		os.ExpandEnv("PATH=$PATH"), // git must be installed!
 	}
-	buildLogger.Infof("install goimports: %+v", cmd)
+	buildLogger.Infof("install %s: %+v", toolname, cmd)
 	out, err := cmd.CombinedOutput()
 	if err == nil {
-		binpath := filepath.Join(plugindir, "bin", "goimports")
+		binpath := filepath.Join(plugindir, "bin", toolname)
 		return &binpath, nil
 	}
-	return nil, fmt.Errorf("Error installing 'goimports': %s (%v)", string(out), err)
+	return nil, fmt.Errorf("Error installing '%s': %s (%v)", toolname, string(out), err)
+}
+
+func (ws *GoWorkspace) InstallGoimports(plugindir string) (*string, error) {
+	return ws.InstallGoTool(plugindir, "goimports")
+}
+
+func (ws *GoWorkspace) InstallGoOracle(plugindir string) (*string, error) {
+	return ws.InstallGoTool(plugindir, "oracle")
 }
 
 func (ws *GoWorkspace) QueryPackages() (res Godoc_results) {

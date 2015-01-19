@@ -61,6 +61,7 @@ func (w *workspace) register(container *restful.Container) {
 	ws.Route(ws.POST("/build").To(w.buildWorkspace).Reads(buildRequest{}).Writes(buildResponse{}))
 	ws.Route(ws.POST("/autocomplete").To(w.autocomplete).Reads(autocomplete{}).Writes(autocompleteResult{}))
 	ws.Route(ws.POST("/parseSource").To(w.parseSource).Reads(parsesource{}).Writes(parsesourceResult{}))
+	ws.Route(ws.POST("/oracle").To(w.oracle).Reads(oracleRq{}).Writes(oracleResult{}))
 	ws.Route(ws.POST("/opentype").To(w.openType).Reads(openType{}).Writes(openTypeResult{}))
 	ws.Route(ws.GET("/querypackages").To(w.querypackages).Writes(query_packages{}))
 	ws.Route(ws.GET("/queryremotepackages").To(w.queryremotepackages).Writes(query_packages{}))
@@ -78,9 +79,7 @@ type (
 		Filter string                  `json:"filter"`
 		Tokens []builder.TokenPosition `json:"tokens"`
 	}
-)
 
-type (
 	autocomplete struct {
 		Content string `json:"content"`
 		Path    string `json:"path"`
@@ -91,9 +90,7 @@ type (
 	autocompleteResult struct {
 		Suggestions []builder.Suggestion `json:"suggestions"`
 	}
-)
 
-type (
 	parsesource struct {
 		Content    string  `json:"content"`
 		Filesystem *string `json:"filesystem"`
@@ -102,9 +99,7 @@ type (
 	parsesourceResult struct {
 		Tokens []builder.TokenPosition `json:"tokens"`
 	}
-)
 
-type (
 	query_package struct {
 		Name  string `json:"name"`
 		Descr string `json:"description"`
@@ -112,6 +107,16 @@ type (
 	query_packages struct {
 		Query    string          `json:"query"`
 		Packages []query_package `json:"packages"`
+	}
+
+	oracleRq struct {
+		Package  string `json:"package"`
+		Filename string `json:"filename"`
+		Offset   int    `json:"offset"`
+		Column   int    `json:"column"`
+	}
+	oracleResult struct {
+		Result string `json:"result"`
 	}
 )
 type (
@@ -651,6 +656,18 @@ func (serv *workspace) queryremotepackages(request *restful.Request, response *r
 	response.WriteEntity(result)
 }
 
+func (serv *workspace) oracle(request *restful.Request, response *restful.Response) {
+	rq := new(oracleRq)
+	err := request.ReadEntity(&rq)
+	if err != nil {
+		sendError(response, http.StatusBadRequest, fmt.Errorf("Error reading oracleRq content: %s", err))
+		return
+	}
+	workspaceLogger.Infof("oracle: %v", *rq)
+	var result oracleResult
+	response.WriteEntity(result)
+}
+
 func (serv *workspace) parseSource(request *restful.Request, response *restful.Response) {
 	rq := new(parsesource)
 	err := request.ReadEntity(&rq)
@@ -752,6 +769,7 @@ type workspace struct {
 	goapptool   *string
 	gocode      *string
 	goimports   *string
+	gooracle    *string
 	goworkspace *builder.GoWorkspace
 	config      map[string]interface{}
 
@@ -859,20 +877,32 @@ func NewWorkspace(path string, version string) error {
 		workspaceLogger.Infof("gocode: %s", *w.gocode)
 	}
 
-	goimports, err := findInPluginsOrEnvironment(plugindir, "goimports")
-	if err != nil {
-		workspaceLogger.Infof("no goimports found in path: %s", err)
-		gimp, err := gws.InstallGoimports(plugindir)
-		if err == nil {
-			w.goimports = gimp
+	tools := []string{"goimports", "oracle"}
+	for _, t := range tools {
+		tp, err := findInPluginsOrEnvironment(plugindir, t)
+		if err != nil {
+			workspaceLogger.Infof("no %s found in path: %s", t, err)
+			gt, err := gws.InstallGoTool(plugindir, t)
+			if err == nil {
+				switch t {
+				case "goimports":
+					w.goimports = gt
+				case "oracle":
+					w.gooracle = gt
+				}
+			} else {
+				workspaceLogger.Infof("%s cannot be installed: %s", t, err)
+			}
 		} else {
-			workspaceLogger.Infof("goimports cannot be installed: %s", err)
+			switch t {
+			case "goimports":
+				w.goimports = tp
+			case "oracle":
+				w.gooracle = tp
+			}
+			workspaceLogger.Infof("%s: %s", t, *w.gocode)
 		}
-	} else {
-		w.goimports = goimports
-		workspaceLogger.Infof("goimports: %s", *w.gocode)
 	}
-
 	wsContainer := restful.NewContainer()
 	w.register(wsContainer)
 
