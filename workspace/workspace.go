@@ -2,19 +2,16 @@ package workspace
 
 import (
 	"bytes"
-	"code.google.com/p/go.net/websocket"
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"code.google.com/p/go.net/websocket"
 	"github.com/emicklei/go-restful"
 	// "github.com/howeyc/fsnotify"
-	"github.com/ulrichSchreiner/carpo/workspace/builder"
-	"github.com/ulrichSchreiner/carpo/workspace/filesystem"
-	"github.com/ulrichSchreiner/gdbmi"
 	"go/format"
 	"io"
 	"io/ioutil"
-	"launchpad.net/loggo"
 	"net/http"
 	"os"
 	"os/exec"
@@ -22,6 +19,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/ulrichSchreiner/carpo/workspace/builder"
+	"github.com/ulrichSchreiner/carpo/workspace/filesystem"
+	"github.com/ulrichSchreiner/gdbmi"
+	"launchpad.net/loggo"
 )
 
 type buildType string
@@ -717,6 +719,7 @@ func (serv *workspace) autocomplete(request *restful.Request, response *restful.
 func (serv *workspace) formatSource(src []byte) ([]byte, error) {
 	if serv.goimports != nil {
 		cmd := exec.Command(*serv.goimports)
+		cmd.Env = []string{fmt.Sprintf("GOPATH=%s", serv.goworkspace.GoPathString)}
 		buf := bytes.NewBuffer(src)
 		cmd.Stdin = buf
 		return cmd.Output()
