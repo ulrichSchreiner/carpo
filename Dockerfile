@@ -1,4 +1,4 @@
-FROM ubuntu
+FROM ubuntu:14.10
 
 RUN apt-get -y update && apt-get install -y \
   git \
@@ -12,22 +12,16 @@ RUN apt-get -y update && apt-get install -y \
   python-dev \
   locales \
   python-pip \
-  zip 
+  zip \
+  curl
 
 ENV LC_ALL C.UTF-8
 
-RUN mkdir /download
-RUN cd /download && wget https://godeb.s3.amazonaws.com/godeb-amd64.tar.gz
-RUN cd /download && tar xzf godeb-amd64.tar.gz
-RUN cd /download && ./godeb install 1.2.1
-
-RUN useradd -d /carpo carpo
+RUN curl https://storage.googleapis.com/golang/go1.4.1.linux-amd64.tar.gz |tar -C /usr/local -xz
+ENV PATH /usr/local/go/bin/:/work/bin:$PATH
 RUN mkdir /workspace
 RUN mkdir -p /work/src/github.com/ulrichSchreiner/ /work/pkg /work/bin
-RUN chown carpo:carpo /workspace
-RUN chown -R carpo:carpo /work
 WORKDIR /work
-USER carpo
 ENV GOPATH /work
 RUN go get code.google.com/p/go.net/websocket && \ 
   go get github.com/emicklei/go-restful && \
@@ -41,9 +35,6 @@ RUN cd src/github.com/ulrichSchreiner/carpo/qx/carpo/source/qooxdoo && git check
 RUN cd src/github.com/ulrichSchreiner/carpo/cmd && ./createdist
 
 WORKDIR /workspace
-RUN mkdir -p .carpoplugins/src .carpoplugins/bin .carpoplugins/pkg
-ENV GOPATH /workspace/.carpoplugins
-RUN go get -u github.com/nsf/gocode
 
 ENV GOPATH /workspace
 VOLUME ["/workspace"]
