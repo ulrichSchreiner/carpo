@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/ulrichSchreiner/carpo/workspace/filesystem"
 	"launchpad.net/loggo"
@@ -180,8 +181,8 @@ func (ws *GoWorkspace) Shutdown() {
 	}
 }
 func (ws *GoWorkspace) BuildPackage(base filesystem.WorkspaceFS, packdir string) (*[]BuildResult, *[]string, error) {
-	args := []string{}
-	dirs := []string{}
+	//args := []string{}
+	//dirs := []string{}
 	pack, err := ws.findPackageFromDirectory(packdir)
 	if err != nil {
 		return nil, nil, fmt.Errorf("findPackageFromDirectory: %s", err)
@@ -193,30 +194,44 @@ func (ws *GoWorkspace) BuildPackage(base filesystem.WorkspaceFS, packdir string)
 	}
 	srcdir := ws.findDirectoryFromPackage(pack)
 	ws.Typeserver.RefreshPackage(base, "/"+srcdir, pack)
-	args = append(args, pack)
-	dirs = append(dirs, srcdir)
-	deps, ok := ws.neededBy[pack]
-	if ok {
-		args = append(args, deps...)
-		for _, d := range deps {
-			dirs = append(dirs, ws.findDirectoryFromPackage(d))
+	var sdirs, tdirs, packagesToRecompile []string
+	var buildres, testres string
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		args := []string{pack}
+		sdirs = append(sdirs, srcdir)
+		deps, ok := ws.neededBy[pack]
+		if ok {
+			args = append(args, deps...)
+			for _, d := range deps {
+				sdirs = append(sdirs, ws.findDirectoryFromPackage(d))
+			}
 		}
-	}
-	packagesToRecompile := args
-	res, err := ws.build(packagesToRecompile...)
-	if err != nil {
-		return nil, nil, err
-	}
+		packagesToRecompile = args
+		res, err := ws.build(packagesToRecompile...)
+		if err != nil {
+			buildres = res
+		}
+		wg.Done()
+	}()
 	// now for the tests ...
-	deps, ok = ws.testneededBy[pack]
-	args = []string{pack}
-	if ok {
-		args = append(args, deps...)
-		for _, d := range deps {
-			dirs = append(dirs, ws.findDirectoryFromPackage(d))
+	wg.Add(1)
+	go func() {
+		deps, ok := ws.testneededBy[pack]
+		args := []string{pack}
+		if ok {
+			args = append(args, deps...)
+			for _, d := range deps {
+				tdirs = append(tdirs, ws.findDirectoryFromPackage(d))
+			}
 		}
-	}
-	res = res + "\n" + ws.buildtests(args...)
+		testres = ws.buildtests(args...)
+		wg.Done()
+	}()
+	wg.Wait()
+	res := buildres + "\n" + testres
+	//res = res + "\n" + ws.buildtests(args...)
 	parsed := ws.parseBuildOutput(base, res)
 	if len(parsed) == 0 {
 		// vet only if no compile error
@@ -227,7 +242,8 @@ func (ws *GoWorkspace) BuildPackage(base filesystem.WorkspaceFS, packdir string)
 		}
 	}
 	ws.Build = ws.mergeBuildResults(packagesToRecompile, parsed)
-	return &ws.Build, &dirs, nil
+	sdirs = append(sdirs, tdirs...)
+	return &ws.Build, &sdirs, nil
 }
 
 func (ws *GoWorkspace) FullBuild(base filesystem.WorkspaceFS, ignoredPackages map[string]bool) (*[]BuildResult, *[]string, error) {
