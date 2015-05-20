@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 
-	"code.google.com/p/go.net/websocket"
 	"github.com/emicklei/go-restful"
+	"golang.org/x/net/websocket"
 	// "github.com/howeyc/fsnotify"
 	"go/format"
 	"io"

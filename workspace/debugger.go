@@ -1,14 +1,15 @@
 package workspace
 
 import (
-	"code.google.com/p/go.net/websocket"
 	"encoding/json"
 	"fmt"
+	"io"
+	"strings"
+
 	"github.com/ulrichSchreiner/carpo/workspace/filesystem"
 	"github.com/ulrichSchreiner/gdbmi"
-	"io"
+	"golang.org/x/net/websocket"
 	"launchpad.net/loggo"
-	"strings"
 )
 
 type debugEvent string

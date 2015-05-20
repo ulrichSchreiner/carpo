@@ -168,7 +168,7 @@ qx.Class.define("carpo.FileBrowser", {
         controller.bindDefaultProperties(item, id);
         var mod = item.getModel();
         if (mod && !mod.getDir()) {
-          var listenid = item.addListener("dblclick", function (e) {
+          var listenid = item.addListener("dbltap", function (e) {
             var selection = this.tree.getSelection();
             var node = selection.getItem(0);
             if (node && !node.getDir()) {

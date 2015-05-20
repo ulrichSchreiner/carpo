@@ -133,7 +133,7 @@ qx.Class.define("carpo.Application",
         this.compileroutput.getSelectionModel().setSelectionMode(qx.ui.table.selection.Model.SINGLE_INTERVAL_SELECTION);                
         for (var i=0; i<columns.length; i++)
           this.compileroutput.setContextMenuHandler(i, this.problemContextMenu, this);
-        this.compileroutput.addListener("cellDblclick", function (e) {
+        this.compileroutput.addListener("cellDbltap", function (e) {
             var row = e.getRow();
             var data = this.compileroutputModel.getRowData(row);
             this.showError (data[1], data[2], data[3], data[4], data[5]);
@@ -1226,7 +1226,7 @@ qx.Class.define("carpo.Application",
             ed.getAceEditor().focus();
         }
       }, this);
-      list.addListener("dblclick", function (e) {
+      list.addListener("cellDbltap", function (e) {
           var ed = this.editors.getCurrentEditor();
           //if (ed) {
             selfunc(ed, list.getSelection().toArray()[0]);

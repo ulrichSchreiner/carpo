@@ -1,10 +1,11 @@
 package builder
 
 import (
-	"github.com/ulrichSchreiner/carpo/workspace/filesystem"
-	"launchpad.net/loggo"
 	"path/filepath"
 	"sync"
+
+	"github.com/ulrichSchreiner/carpo/workspace/filesystem"
+	"launchpad.net/loggo"
 )
 
 var typeserviceLogger = loggo.GetLogger("typeservice")
