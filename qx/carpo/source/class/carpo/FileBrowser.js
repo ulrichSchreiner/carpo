@@ -51,7 +51,7 @@ qx.Class.define("carpo.FileBrowser", {
       this.tree = new qx.ui.tree.VirtualTree(model, "label", "children");
       
       var self = this;
-      this.tree.setOpenMode("dblclick");
+      this.tree.setOpenMode("dbltap");
       this.tree.setHideRoot(true);
       this.tree.setDelegate(this.createTreeDelegate(function(d) {return true;}));
       this.tree.addListener ("open", function (e) {
@@ -62,13 +62,13 @@ qx.Class.define("carpo.FileBrowser", {
       }, this);
       this.loadContent (model.getPath(), model);
       this.model = model;
-      this._newFileCommand = new qx.ui.core.Command();
+      this._newFileCommand = new qx.ui.command.Command();
       this._newFileCommand.addListener("execute", this.newFile, this);
-      this._newFolderCommand = new qx.ui.core.Command();
+      this._newFolderCommand = new qx.ui.command.Command();
       this._newFolderCommand.addListener("execute", this.newFolder, this);
-      this._removeFileCommand = new qx.ui.core.Command ();
+      this._removeFileCommand = new qx.ui.command.Command ();
       this._removeFileCommand.addListener("execute", this.removeFile, this);
-      this._excludePackageCommand = new qx.ui.core.Command ();
+      this._excludePackageCommand = new qx.ui.command.Command ();
       this._excludePackageCommand.addListener("execute", this.excludePackage, this);
       
       this.add(this.tree, {flex:1});

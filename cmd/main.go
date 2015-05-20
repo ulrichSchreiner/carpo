@@ -3,9 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/ulrichSchreiner/carpo/client"
-	"github.com/ulrichSchreiner/carpo/workspace"
-	"launchpad.net/loggo"
 	"log"
 	"net"
 	"net/http"
@@ -13,6 +10,10 @@ import (
 	"os/exec"
 	"runtime"
 	"time"
+
+	"github.com/ulrichSchreiner/carpo/client"
+	"github.com/ulrichSchreiner/carpo/workspace"
+	"launchpad.net/loggo"
 )
 
 var port = flag.Int("port", 8787, "the port to use for carpo")

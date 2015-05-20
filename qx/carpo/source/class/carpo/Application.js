@@ -461,31 +461,31 @@ qx.Class.define("carpo.Application",
     },
     
     createCommands : function () {
-        this._saveCommand = new qx.ui.core.Command("Ctrl+S");
+        this._saveCommand = new qx.ui.command.Command("Ctrl+S");
         this._saveCommand.addListener("execute", this.saveFile, this);
-        this._closeAllCommand = new qx.ui.core.Command ();
+        this._closeAllCommand = new qx.ui.command.Command ();
         this._closeAllCommand.addListener("execute", this.closeAll, this);
-        this._settingsCommand = new qx.ui.core.Command();
+        this._settingsCommand = new qx.ui.command.Command();
         this._settingsCommand.addListener("execute", this.showSettings, this);
-        this._buildCommand = new qx.ui.core.Command("Ctrl-B");
+        this._buildCommand = new qx.ui.command.Command("Ctrl-B");
         this._buildCommand.addListener("execute", this.build, this);
-        this._exitCommand = new qx.ui.core.Command("Ctrl-Q");
+        this._exitCommand = new qx.ui.command.Command("Ctrl-Q");
         this._exitCommand.addListener("execute", this.exit, this);
-        this._runCommand = new qx.ui.core.Command("Ctrl-R");
+        this._runCommand = new qx.ui.command.Command("Ctrl-R");
         this._runCommand.addListener("execute", this.run, this);
-        this._saveAllCommand = new qx.ui.core.Command();
+        this._saveAllCommand = new qx.ui.command.Command();
         this._saveAllCommand.addListener("execute", this.saveAll, this);
-        this._installGocode = new qx.ui.core.Command();
+        this._installGocode = new qx.ui.command.Command();
         this._installGocode.addListener("execute", this.installGocode, this);
-        this._addImport = new qx.ui.core.Command("Ctrl-Shift-M");
+        this._addImport = new qx.ui.command.Command("Ctrl-Shift-M");
         this._addImport.addListener("execute", this.addImport, this);
-        this._addPackage = new qx.ui.core.Command("Ctrl-Shift-J");
+        this._addPackage = new qx.ui.command.Command("Ctrl-Shift-J");
         this._addPackage.addListener("execute", this.addPackage, this);
-        this._createGoProject = new qx.ui.core.Command();
+        this._createGoProject = new qx.ui.command.Command();
         this._createGoProject.addListener("execute", this.createGoProject, this);
-        this._showPackage = new qx.ui.core.Command("Alt-Shift-P");
+        this._showPackage = new qx.ui.command.Command("Alt-Shift-P");
         this._showPackage.addListener("execute", this.showPackageStructure, this);
-        this._gotoType = new qx.ui.core.Command("Alt-Shift-T");
+        this._gotoType = new qx.ui.command.Command("Alt-Shift-T");
         this._gotoType.addListener("execute", this.openType, this);
     },
     getRunningToolbar : function (output) {

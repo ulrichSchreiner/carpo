@@ -105,19 +105,19 @@ qx.Class.define("carpo.DebugPanel", {
       },
       
       createCommands : function () {
-        this._run = new qx.ui.core.Command();
+        this._run = new qx.ui.command.Command();
         this._run.addListener("execute", this.step_run, this);
         this._run.set({enabled:false});
-        this._pause = new qx.ui.core.Command();
+        this._pause = new qx.ui.command.Command();
         this._pause.addListener("execute", this.step_pause, this);
         this._pause.set({enabled:false});
-        this._stepinto = new qx.ui.core.Command();
+        this._stepinto = new qx.ui.command.Command();
         this._stepinto.addListener("execute", this.step_stepinto, this);
         this._stepinto.set({enabled:false});
-        this._stepover = new qx.ui.core.Command();
+        this._stepover = new qx.ui.command.Command();
         this._stepover.addListener("execute", this.step_stepover, this);
         this._stepover.set({enabled:false});
-        this._stepout = new qx.ui.core.Command();
+        this._stepout = new qx.ui.command.Command();
         this._stepout.addListener("execute", this.step_stepout, this);
         this._stepout.set({enabled:false});
       },
