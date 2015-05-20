@@ -73,7 +73,7 @@ func (serv *workspace) createtemplate(rq *servertemplate, template string) (*ser
 	}
 	fl.Write([]byte(template))
 	fl.Close()
-	serv.goworkspace.BuildPackage(serv.goworkspace.DefaultFS, rq.ImportPath)
+	serv.goworkspace.BuildPackage(serv.goworkspace.DefaultFS, rq.ImportPath, false, false)
 	var res servertemplate_result
 	res.Filesystem = serv.goworkspace.DefaultFS.Name()
 	res.Path = fmt.Sprintf("/%s", maingo)

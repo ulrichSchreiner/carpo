@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/ulrichSchreiner/carpo/workspace/filesystem"
 	"go/build"
 	"go/parser"
 	"go/token"
@@ -16,6 +15,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/ulrichSchreiner/carpo/workspace/filesystem"
 )
 
 type goCommand string
@@ -200,6 +201,21 @@ func (ws *GoWorkspace) gocmd(gobin string, command string, dir string, args ...s
 	return string(res), nil
 }
 
+func (ws *GoWorkspace) plugin(command string, dir string, args ...string) (string, error) {
+	cmd := exec.Command(filepath.Join(ws.plugindir, "bin", command), args...)
+	cmd.Dir = dir
+	cmd.Env = []string{fmt.Sprintf("GOPATH=%s", ws.context.GOPATH), fmt.Sprintf("PATH=%s", os.ExpandEnv("$PATH"))}
+	res, err := cmd.CombinedOutput()
+	if err != nil {
+		// check if the command resulted with an error-exit code
+		if _, ok := err.(*exec.ExitError); !ok {
+			// no Exit-Error --> a fundamental problem occured
+			return "", err
+		}
+	}
+	return string(res), nil
+}
+
 func (ws *GoWorkspace) env(key string) (root string, err error) {
 	root, err = ws.gocmd(ws.gobinpath, string(goCommand_env), ws.Workdir, key)
 	if err == nil {
@@ -213,21 +229,16 @@ func (ws *GoWorkspace) build(args ...string) (res string, err error) {
 	//buildargs := []string{"-race"}
 
 	//args = append(buildargs, args...)
-	res, err = ws.gocmd(ws.gobinpath, string(goCommand_build), ws.Workdir, args...)
-	if err == nil {
-		//res = res + "\n" + ws.buildtests(gobin, args...)
-	}
-	return res, err
+	return ws.gocmd(ws.gobinpath, string(goCommand_build), ws.Workdir, args...)
+}
+
+func (ws *GoWorkspace) lint(args ...string) (res string, err error) {
+	return ws.plugin("golint", ws.Workdir, args...)
 }
 
 func (ws *GoWorkspace) vet(args ...string) (res string, err error) {
-	res, err = ws.gocmd(ws.gobinpath, string(goCommand_vet), ws.Workdir, args...)
-	if err == nil {
-		//res = res + "\n" + ws.buildtests(gobin, args...)
-	}
-	return res, err
+	return ws.gocmd(ws.gobinpath, string(goCommand_vet), ws.Workdir, args...)
 }
-
 func (ws *GoWorkspace) buildtests(args ...string) (res string) {
 	for _, p := range args {
 		if ws.packageHasTests(p) {

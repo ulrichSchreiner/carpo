@@ -21,7 +21,9 @@ qx.Class.define("carpo.Settings", {
             return {
                 go_path : dlg && dlg.gopath ? dlg.gopath.getValue():null,
                 goapp_path : dlg && dlg.goapppath ? dlg.goapppath.getValue():null,
-                apptype : dlg && dlg.apptype ? dlg.apptype.getSelection()[0].getModel():"go"
+                apptype : dlg && dlg.apptype ? dlg.apptype.getSelection()[0].getModel():"go",
+                vet : dlg && dlg.usevet ? dlg.usevet.isValue():false,
+                lint: dlg && dlg.uselint ? dlg.uselint.isValue():false
             };
         },
         
@@ -29,7 +31,7 @@ qx.Class.define("carpo.Settings", {
             return {
                 editor : carpo.Settings.getEditorSettings(dlg),
                 go : carpo.Settings.getGoSettings(dlg)
-            }
+            };
         }        
     },
     
@@ -145,6 +147,13 @@ qx.Class.define("carpo.Settings", {
             if (this._settings.go.apptype) selectBox.setModelSelection([this._settings.go.apptype]);
             this.apptype = selectBox;
             form.add (this.apptype, "Application Type");
+            
+            this.usevet = new qx.ui.form.CheckBox("Use go vet when saving");
+            if (this._settings.go.vet) this.usevet.setValue(this._settings.go.vet);
+            form.add(this.usevet, "");
+            this.uselint = new qx.ui.form.CheckBox("Use golint when saving");
+            if (this._settings.go.lint) this.uselint.setValue(this._settings.go.lint);
+            form.add(this.uselint, "");
             
             var page = new qx.ui.tabview.Page("Go");
             page.setLayout(new qx.ui.layout.VBox());

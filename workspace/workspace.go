@@ -123,6 +123,12 @@ type (
 	gocodeenv struct {
 		Path *string `json:"path"`
 	}
+
+	tool struct {
+		pack string
+		cmd  string
+		targ **string
+	}
 )
 
 type (
@@ -245,7 +251,8 @@ func (serv *workspace) save(request *restful.Request, response *restful.Response
 	if rq.Build {
 		if isgo {
 			fres.BuildType = BUILD_GOLANG
-			output, _, err := serv.goworkspace.BuildPackage(fs, fp)
+			v, l := serv.vetAndLint()
+			output, _, err := serv.goworkspace.BuildPackage(fs, fp, v, l)
 			if err != nil {
 				workspaceLogger.Errorf("%s", err)
 				fres.Message = err.Error()
@@ -459,7 +466,7 @@ func (serv *workspace) saveConfig(request *restful.Request, response *restful.Re
 	serv.config = conf.(map[string]interface{})
 	newgo := serv.gobinpath()
 	if bytes.Compare([]byte(*oldgo), []byte(*newgo)) != 0 {
-		gws := builder.NewGoWorkspace(*newgo, serv.Path, serv.gocode, serv.filesystems)
+		gws := builder.NewGoWorkspace(*newgo, serv.Path, serv.gocode, *serv.golint, serv.filesystems)
 		serv.goworkspace.Shutdown()
 		serv.goworkspace = gws
 	}
@@ -577,6 +584,15 @@ func (serv *workspace) get_build_type() (apptype buildType, go_settings map[stri
 		}
 	}
 	return
+}
+
+func (serv *workspace) vetAndLint() (bool, bool) {
+	if _, go_settings, ok := serv.get_build_type(); ok {
+		lint, _ := go_settings["lint"].(bool)
+		vet, _ := go_settings["vet"].(bool)
+		return vet, lint
+	}
+	return false, false
 }
 
 func (serv *workspace) gobinpath() *string {
@@ -770,6 +786,7 @@ type workspace struct {
 	gocode      *string
 	goimports   *string
 	gooracle    *string
+	golint      *string
 	goworkspace *builder.GoWorkspace
 	config      map[string]interface{}
 
@@ -861,48 +878,31 @@ func NewWorkspace(path string, version string) error {
 		}
 	}
 
-	gws := builder.NewGoWorkspace(*gobinpath, path, w.gocode, w.filesystems)
+	gws := builder.NewGoWorkspace(*gobinpath, path, w.gocode, plugindir, w.filesystems)
 	w.goworkspace = gws
-	gocode, err := findInPluginsOrEnvironment(plugindir, "gocode")
-	if err != nil {
-		workspaceLogger.Infof("no gocode found in path: %s", err)
-		goco, err := gws.InstallGocode(plugindir)
-		if err == nil {
-			w.gocode = goco
-		} else {
-			workspaceLogger.Infof("gocode cannot be installed: %s", err)
-		}
-	} else {
-		w.gocode = gocode
-		workspaceLogger.Infof("gocode: %s", *w.gocode)
+	tools := []tool{
+		{"github.com/nsf/gocode", "gocode", &w.gocode},
+		{"golang.org/x/tools/cmd/goimports", "goimports", &w.goimports},
+		{"golang.org/x/tools/cmd/oracle", "oracle", &w.gooracle},
+		{"github.com/golang/lint/golint", "golint", &w.golint},
 	}
 
-	tools := []string{"goimports", "oracle"}
-	for _, t := range tools {
-		tp, err := findInPluginsOrEnvironment(plugindir, t)
-		if err != nil {
-			workspaceLogger.Infof("no %s found in path: %s", t, err)
-			gt, err := gws.InstallGoTool(plugindir, t)
+	var wg sync.WaitGroup
+	for _, at := range tools {
+		wg.Add(1)
+		go func(t tool) {
+			workspaceLogger.Infof("update/install %s in pluginpath", t.cmd)
+			gt, err := gws.InstallPlugin(plugindir, t.pack, t.cmd)
 			if err == nil {
-				switch t {
-				case "goimports":
-					w.goimports = gt
-				case "oracle":
-					w.gooracle = gt
-				}
+				*t.targ = gt
 			} else {
-				workspaceLogger.Infof("%s cannot be installed: %s", t, err)
+				workspaceLogger.Infof("%s cannot be installed: %s", t.pack, err)
 			}
-		} else {
-			switch t {
-			case "goimports":
-				w.goimports = tp
-			case "oracle":
-				w.gooracle = tp
-			}
-			workspaceLogger.Infof("%s: %s", t, *w.gocode)
-		}
+			wg.Done()
+		}(at)
 	}
+	wg.Wait()
+	workspaceLogger.Infof("Workspace initialized")
 	wsContainer := restful.NewContainer()
 	w.register(wsContainer)
 

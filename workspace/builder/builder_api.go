@@ -77,6 +77,7 @@ type GoWorkspace struct {
 	testneededBy       map[string][]string
 	testdependencies   map[string][]string
 	gobinpath          string
+	plugindir          string
 	gocode             *os.Process
 	filesystems        map[string]filesystem.WorkspaceFS
 	filesystemsOrdered []filesystem.WorkspaceFS
@@ -101,10 +102,11 @@ func append_workspace_if_not_present(ws string, gp string) string {
 	return fmt.Sprintf("%s%s%s", ws, string(filepath.ListSeparator), gp)
 }
 
-func NewGoWorkspace(gobin string, wspath string, gocode *string, fs map[string]filesystem.WorkspaceFS) *GoWorkspace {
+func NewGoWorkspace(gobin string, wspath string, gocode *string, plugindir string, fs map[string]filesystem.WorkspaceFS) *GoWorkspace {
 	g := new(GoWorkspace)
 	g.Typeserver = NewTypeService()
 	g.gobinpath = gobin
+	g.plugindir = plugindir
 	g.filesystems = fs
 	g.Packages = make(map[string]*build.Package)
 	g.SystemPackages = make(map[string]*build.Package)
@@ -180,7 +182,7 @@ func (ws *GoWorkspace) Shutdown() {
 		ws.gocode.Kill()
 	}
 }
-func (ws *GoWorkspace) BuildPackage(base filesystem.WorkspaceFS, packdir string) (*[]BuildResult, *[]string, error) {
+func (ws *GoWorkspace) BuildPackage(base filesystem.WorkspaceFS, packdir string, vet, lint bool) (*[]BuildResult, *[]string, error) {
 	//args := []string{}
 	//dirs := []string{}
 	pack, err := ws.findPackageFromDirectory(packdir)
@@ -210,9 +212,10 @@ func (ws *GoWorkspace) BuildPackage(base filesystem.WorkspaceFS, packdir string)
 		}
 		packagesToRecompile = args
 		res, err := ws.build(packagesToRecompile...)
-		if err != nil {
+		if err == nil {
 			buildres = res
 		}
+		buildLogger.Debugf("build result: %#v: %s", res, err)
 		wg.Done()
 	}()
 	// now for the tests ...
@@ -233,12 +236,21 @@ func (ws *GoWorkspace) BuildPackage(base filesystem.WorkspaceFS, packdir string)
 	res := buildres + "\n" + testres
 	//res = res + "\n" + ws.buildtests(args...)
 	parsed := ws.parseBuildOutput(base, res)
-	if len(parsed) == 0 {
+	if vet && len(parsed) == 0 {
 		// vet only if no compile error
 		vetres, err := ws.vet(packagesToRecompile...)
 		if err == nil {
 			vetparsed := ws.parseBuildTypedOutput(base, vetres, BUILD_WARNING)
 			parsed = append(parsed, vetparsed...)
+		}
+	}
+	if lint && len(parsed) == 0 {
+		// lint only if no compile error
+		lintres, err := ws.lint(packdir)
+		buildLogger.Debugf("lintres: %#v: %s", lintres, err)
+		if err == nil {
+			lintparsed := ws.parseBuildTypedOutput(base, lintres, BUILD_WARNING)
+			parsed = append(parsed, lintparsed...)
 		}
 	}
 	ws.Build = ws.mergeBuildResults(packagesToRecompile, parsed)
@@ -297,46 +309,26 @@ func (ws *GoWorkspace) InstallPackage(pkg string, plugindir string) (err error) 
 	return err
 }
 
-func (ws *GoWorkspace) InstallGocode(plugindir string) (gocodebinpath *string, err error) {
-	cmd := exec.Command(ws.gobinpath, "get", "-u", "github.com/nsf/gocode")
+func (ws *GoWorkspace) InstallPlugin(plugindir string, repo, binname string) (gocodebinpath *string, err error) {
+	cmd := exec.Command(ws.gobinpath, "get", "-u", repo)
 	cmd.Dir = plugindir
 	cmd.Env = []string{
 		fmt.Sprintf("GOPATH=%s", plugindir),
 		os.ExpandEnv("PATH=$PATH"), // git must be installed!
 	}
-	buildLogger.Infof("install gocode: %+v", cmd)
+	buildLogger.Infof("install %s: %+v", binname, cmd)
 	out, err := cmd.CombinedOutput()
 	if err == nil {
-		gopath := filepath.Join(plugindir, "bin", "gocode")
+		gopath := filepath.Join(plugindir, "bin", binname)
 		return &gopath, nil
 	} else {
-		err = fmt.Errorf("Error installing 'gocode': %s (%v)", string(out), err)
+		err = fmt.Errorf("Error installing '%s': %s (%v)", binname, string(out), err)
 	}
 	return
 }
 
-func (ws *GoWorkspace) InstallGoTool(plugindir string, toolname string) (*string, error) {
-	cmd := exec.Command(ws.gobinpath, "get", "-u", fmt.Sprintf("golang.org/x/tools/cmd/%s", toolname))
-	cmd.Dir = plugindir
-	cmd.Env = []string{
-		fmt.Sprintf("GOPATH=%s", plugindir),
-		os.ExpandEnv("PATH=$PATH"), // git must be installed!
-	}
-	buildLogger.Infof("install %s: %+v", toolname, cmd)
-	out, err := cmd.CombinedOutput()
-	if err == nil {
-		binpath := filepath.Join(plugindir, "bin", toolname)
-		return &binpath, nil
-	}
-	return nil, fmt.Errorf("Error installing '%s': %s (%v)", toolname, string(out), err)
-}
-
-func (ws *GoWorkspace) InstallGoimports(plugindir string) (*string, error) {
-	return ws.InstallGoTool(plugindir, "goimports")
-}
-
-func (ws *GoWorkspace) InstallGoOracle(plugindir string) (*string, error) {
-	return ws.InstallGoTool(plugindir, "oracle")
+func (ws *GoWorkspace) InstallGocode(plugindir string) (gocodebinpath *string, err error) {
+	return ws.InstallPlugin(plugindir, "github.com/nsf/gocode", "gocode")
 }
 
 func (ws *GoWorkspace) QueryPackages() (res Godoc_results) {
