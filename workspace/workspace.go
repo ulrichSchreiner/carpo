@@ -882,8 +882,6 @@ func NewWorkspace(path string, version string) error {
 	w.goworkspace = gws
 	tools := []tool{
 		{"github.com/nsf/gocode", "gocode", &w.gocode},
-		{"golang.org/x/tools/cmd/goimports", "goimports", &w.goimports},
-		{"golang.org/x/tools/cmd/oracle", "oracle", &w.gooracle},
 		{"github.com/golang/lint/golint", "golint", &w.golint},
 	}
 
@@ -901,6 +899,27 @@ func NewWorkspace(path string, version string) error {
 			wg.Done()
 		}(at)
 	}
+	wg.Add(1)
+	go func() {
+		// install these tools sequential because the use the same repo and
+		// a parallel installation will invoke parallel 'git' commands in the
+		// same local repo
+		toolsGolang := []tool{
+			{"golang.org/x/tools/cmd/goimports", "goimports", &w.goimports},
+			{"golang.org/x/tools/cmd/oracle", "oracle", &w.gooracle},
+		}
+		for _, t := range toolsGolang {
+			workspaceLogger.Infof("update/install %s in pluginpath", t.cmd)
+			gt, err := gws.InstallPlugin(plugindir, t.pack, t.cmd)
+			if err == nil {
+				*t.targ = gt
+			} else {
+				workspaceLogger.Infof("%s cannot be installed: %s", t.pack, err)
+			}
+		}
+		wg.Done()
+	}()
+
 	wg.Wait()
 	workspaceLogger.Infof("Workspace initialized")
 	wsContainer := restful.NewContainer()
