@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 rm -f dist/carpo
 rm -f dist/app.zip
-go build -ldflags "-X main.carpo_version `date +%s`" -o dist/carpo_raw
+go build -ldflags "-X main.carpo_version=`date +%s`" -o dist/carpo_raw
 cd ../qx/carpo
 ./generate build
 cd build

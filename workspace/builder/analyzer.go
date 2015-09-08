@@ -109,7 +109,7 @@ func parseFileset(wks filesystem.WorkspaceFS, f *ast.File, fs *token.FileSet) []
 		switch x := d.(type) {
 		case *ast.FuncDecl:
 			pos := fs.Position(x.Pos())
-			if x.Recv != nil {
+			if x.Recv != nil && len(x.Recv.List) > 0 {
 				var recv *string
 				n := x.Recv.List[0].Type
 				id, ok := n.(*ast.Ident)
