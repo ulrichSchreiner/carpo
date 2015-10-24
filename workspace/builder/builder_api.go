@@ -93,6 +93,9 @@ type Godoc_results struct {
 }
 
 func append_workspace_if_not_present(ws string, gp string) string {
+        if gp == "" {
+            return ws
+        }
 	gplist := filepath.SplitList(gp)
 	for _, gpe := range gplist {
 		if gpe == ws {
